@@ -34,11 +34,12 @@ let rec comb (n, m) =
   else comb (n-1, m) + comb (n-1, m-1)
 
 (* Exercise 3.11(3) *)
-let rec fib_iter n =
-  if n = 1 then (0, 0, 1)
-  else if n = 2 then (0, 1, 1)
-  else
-    (0,0,0)
+let fib_iter n =
+  let rec fib_iter_internal n curr prev =
+    if n = 1 then curr
+    else fib_iter_internal (n-1) (curr+prev) curr
+  in
+    fib_iter_internal n 1 0
 
 (* Exercise 3.11(4) *)
 let rec max_ascii str =
