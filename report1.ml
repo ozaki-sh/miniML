@@ -1,4 +1,5 @@
 (* Exercise 2.6 *)
+(* 四捨五入するために千倍して1の位を見て場合分けをしている *)
 let usdollar_of_yen yen =
   let tmp1 = (float_of_int yen) /. 111.12 *. 100.0 in
   let tmp2 = int_of_float (tmp1 *. 10.0) in
@@ -6,6 +7,7 @@ let usdollar_of_yen yen =
   if modulo >= 5 then (ceil tmp1) /. 100.0
     else (floor tmp1) /. 100.0
 
+(* 文字コードがa-zなら32を引いてA-Zにする *)
 let capitalize x =
   let code = int_of_char x in
   if code >= 97 && code <= 122 then
@@ -42,6 +44,7 @@ let fib_iter n =
     fib_iter_internal n 1 0
 
 (* Exercise 3.11(4) *)
+(* 文字列を頭から順に見ていき、それまでの最大値より大きければ最大値を更新する *)
 let rec max_ascii str =
   let str_length = String.length str in
     if str_length = 1 then str.[0]
@@ -49,6 +52,12 @@ let rec max_ascii str =
       let now_max = max_ascii (String.sub str 1 (str_length-1)) in
       if str.[0] > now_max then str.[0]
       else now_max
+
+(* Exercise 3.12 *)
+let rec arctan_one n =
+  if n < 0 then 0.0
+  else if n = 0 then 1.0
+  else arctan_one (n-1) +. 1.0 /. (float_of_int (4 * n + 1)) -. 1.0 /. (float_of_int (4 * (n-1) + 3))
 
 (* Exercise 4.1 *)
 let integral f a b =
@@ -89,6 +98,16 @@ let rec downto0 n =
   if n = 0 then [0]
   else n :: downto0 (n-1)
 
+(* Exercise 5.3(2) *)
+let rec roman def n =
+  match def with
+    [] -> ""
+  | (num, ch) :: tail ->
+      let n' = n - num in
+        if n' >= 0 then ch ^ roman def n'
+        else roman tail n
+
+
 (* Exercise 5.3(3) *)
 let rec concat l =
   match l with
@@ -112,7 +131,42 @@ let rec filter cond l =
       if (cond head) then head :: (filter cond tail)
       else filter cond tail
 
+(* Exercise 5.3(6) *)
+let rec belong a s =
+  match s with
+    [] -> false
+  | head :: tail ->
+      if head = a then true
+      else belong a tail
+
+let rec intersect s1 s2 =
+  match s1 with
+    [] -> []
+  | head :: tail -> if belong head s2 then head :: intersect tail s2
+                    else intersect tail s2
+
+let rec union s1 s2 =
+  match s1 with
+    [] ->
+      (match s2 with
+         [] -> []
+       | head :: tail ->
+           let tmp = union s1 tail in
+             if belong head tmp then tmp
+             else head :: tmp)
+  | head :: tail ->
+      let tmp = union tail s2 in
+             if belong head tmp then tmp
+             else head :: tmp
+
+let rec diff s1 s2 =
+  match s1 with
+    [] -> []
+  | head :: tail -> if belong head s2 then diff tail s2
+                    else head :: diff tail s2
+
 (* Exercise 5.6 *)
+(* ピボットで分けた後に右のブロックから順にソートすることで@ではなく::でよくなる *)
 let rec quicker l sorted =
   match l with
     [] -> sorted
@@ -127,6 +181,17 @@ let rec quicker l sorted =
 
 let quick l = quicker l []
 
+(* Exercise 5.7 *)
+let squares r =
+  let rec search x y =
+    if x > r then []
+    else if y > x then search (x+1) 0
+    else if (x*x + y*y) > r then search (x+1) 0
+    else if (x*x + y*y) = r then (x, y) :: search (x+1) 0
+    else search x (y+1)
+  in
+    search 0 0
+
 (* Exercise 6.2 *)
 type nat = Zero | OneMoreThan of nat
 
@@ -140,11 +205,13 @@ let rec add n m =
     Zero -> m
   | OneMoreThan n' -> OneMoreThan (add n' m)
 
+(* mをn回足すという考え *)
 let rec mul n m =
   match n with
     Zero -> Zero
   | OneMoreThan n' -> add m (mul n' m)
 
+(* 引く数も引かれる数も1ずつ減らしていって、引く数が0になったときの引かれる数を返す（引かれる数が先に0になったら0を返す *)
 let rec monus n m =
   match n with
     Zero -> Zero
@@ -153,13 +220,39 @@ let rec monus n m =
         Zero -> n
       | OneMoreThan m' -> monus n' m')
 
-(* Exercise 6.6 *)
+(* Exercise 6.4 *)
 type 'a tree = Lf | Br of 'a * 'a tree * 'a tree
 
+let rec comptree x n =
+  if n = 0 then Lf
+  else Br(x, comptree x (n-1), comptree x (n-1))
+
+(* Exercise 6.5 *)
+let inord t =
+  let rec inner_inord t l =
+    match t with
+      Lf -> l
+    | Br(x, left, right) -> inner_inord left (x :: (inner_inord right l))
+  in
+    inner_inord t []
+
+let postord t =
+  let rec inner_postord t l =
+    match t with
+      Lf -> l
+    | Br(x, left, right) -> inner_postord left (inner_postord right (x :: l))
+  in
+    inner_postord t []
+
+(* Exercise 6.6 *)
 let rec reflect t =
   match t with
     Lf -> Lf
   | Br (v, l, r) -> Br (v, reflect r, reflect l)
+
+(* preorder(reflect(t)) = postorder(t)
+   inorder(reflect(t)) =  reverse(inorder(t))
+   postorder(reflect(t)) = preorder(t) *)
 
 (* Exercise 6.9 *)
 type 'a seq = Cons of 'a * (unit -> 'a seq)
@@ -170,6 +263,7 @@ let head (Cons (x, _)) = x
 
 let tail (Cons (_, f)) = f ()
 
+(* 今見ている要素がnの倍数ならそれを飛ばして次を見る *)
 let rec sift n seq =
   match seq with
     Cons (x, f) ->
