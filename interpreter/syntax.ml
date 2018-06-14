@@ -14,6 +14,16 @@ type exp =
            ILit 3, 
            Var "x") --> 
      if x<4 then 3 else x *)
+  | LetExp of id * exp * exp
+  (* LetExp("x", 
+            ILit 5, 
+            BinOp(Plus, Var "x", ILit 3) -->
+     let x = 5 in x + 3 *)
+  | FunExp of id * exp
+  | AppExp of exp * exp
+  | LetRecExp of id * id * exp * exp
 
 type program = 
     Exp of exp
+  | Decl of id * exp
+  | RecDecl of id * id * exp

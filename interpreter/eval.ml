@@ -8,6 +8,7 @@ open Syntax
 type exval =
   | IntV of int
   | BoolV of bool
+  | ProcV of id * exp * dnval Environment.t ref
 and dnval = exval
 
 exception Error of string
@@ -18,6 +19,7 @@ let err s = raise (Error s)
 let rec string_of_exval = function
     IntV i -> string_of_int i
   | BoolV b -> string_of_bool b
+  | ProcV (_, _, _) -> "<fun>"
 
 let pp_val v = print_string (string_of_exval v)
 
@@ -45,6 +47,27 @@ let rec eval_exp env = function
             BoolV true -> eval_exp env exp2 
           | BoolV false -> eval_exp env exp3
           | _ -> err ("Test expression must be boolean: if"))
+  | LetExp (id, exp1, exp2) ->
+      let value = eval_exp env exp1 in
+      eval_exp (Environment.extend id value env) exp2
+  | FunExp (id, exp) -> ProcV (id, exp, ref env)
+  | AppExp (exp1, exp2) ->
+      let funval = eval_exp env exp1 in
+      let arg = eval_exp env exp2 in
+       (match funval with
+          ProcV (id, body, env') ->
+            let newenv = Environment.extend id arg !env' in
+              eval_exp newenv body
+        | _ -> err ("Non-function value is applied"))
+  | LetRecExp (id, para, exp1, exp2) ->
+      let dummyenv = ref Environment.empty in
+      let newenv = Environment.extend id (ProcV (para, exp1, dummyenv)) env in
+        dummyenv := newenv;
+        eval_exp newenv exp2
 
 let eval_decl env = function
     Exp e -> let v = eval_exp env e in ("-", env, v)
+  | Decl (id, e) -> let v = eval_exp env e in (id, Environment.extend id v env, v)
+  | RecDecl (id, para, body) -> 
+      let v = ProcV (para, body, ref env) in (id, Environment.extend id v env, v)
+

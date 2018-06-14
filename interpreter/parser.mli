@@ -6,14 +6,20 @@ type token =
   | THEN
   | SEMISEMI
   | RPAREN
+  | REC
+  | RARROW
   | PLUS
   | MULT
   | LT
   | LPAREN
+  | LET
   | INTV of (int)
+  | IN
   | IF
   | ID of (Syntax.id)
+  | FUN
   | FALSE
+  | EQ
   | ELSE
 
 (* This exception is raised by the monolithic API functions. *)
