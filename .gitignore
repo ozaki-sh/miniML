@@ -8,5 +8,6 @@ lexer.ml
 ._d
 ._ncdi
 .DS_Store
+.nfs*
 interpreter/miniml
 interpreter/parser.automaton
