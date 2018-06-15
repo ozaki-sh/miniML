@@ -1,6 +1,8 @@
 {
 let reservedWords = [
   (* Keywords *)
+  ("and", Parser.LETAND);
+  ("dfun", Parser.DFUN);
   ("else", Parser.ELSE);
   ("false", Parser.FALSE);
   ("fun", Parser.FUN);
@@ -17,6 +19,8 @@ rule main = parse
   (* ignore spacing and newline characters *)
   [' ' '\009' '\012' '\n']+     { main lexbuf }
 
+| "(*" { comment 0 lexbuf }
+
 | "-"? ['0'-'9']+
     { Parser.INTV (int_of_string (Lexing.lexeme lexbuf)) }
 
@@ -24,10 +28,13 @@ rule main = parse
 | ")" { Parser.RPAREN }
 | ";;" { Parser.SEMISEMI }
 | "+" { Parser.PLUS }
+| "-" { Parser.MINUS }
 | "*" { Parser.MULT }
 | "<" { Parser.LT }
 | "=" { Parser.EQ }
 | "->" { Parser.RARROW }
+| "&&" { Parser.AND }
+| "||" { Parser.OR }
 
 | ['a'-'z'] ['a'-'z' '0'-'9' '_' '\'']*
     { let id = Lexing.lexeme lexbuf in
@@ -37,5 +44,13 @@ rule main = parse
       _ -> Parser.ID id
      }
 | eof { exit 0 }
+
+and comment i = parse
+  "(*" { comment (i+1) lexbuf }
+| "*)" 
+  { if i = 0 then main lexbuf
+    else comment (i-1) lexbuf 
+  }
+| _ { comment i lexbuf }
 
 
