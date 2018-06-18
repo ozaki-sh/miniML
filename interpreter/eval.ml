@@ -63,9 +63,10 @@ let rec eval_exp env = function
             let value = eval_exp env exp1 in
             let newenv = Environment.extend id value env' in
               eval_let_list rest newenv
-      in eval_let_list l env
+      in 
+        eval_let_list l env
   | FunExp (id, exp) -> ProcV (id, exp, ref env)
-  | DFunExp (id, exp) -> DProcV (id, exp)
+  | DFunExp (id, exp) -> DProcV (id, exp)       
   | AppExp (exp1, exp2) ->
       let funval = eval_exp env exp1 in
       let arg = eval_exp env exp2 in
@@ -77,16 +78,22 @@ let rec eval_exp env = function
             let newenv = Environment.extend id arg env in
               eval_exp newenv body
         | _ -> err ("Non-function value is applied"))
-  | LetRecExp (id, para, exp1, exp2) ->
-      let dummyenv = ref Environment.empty in
-      let newenv = Environment.extend id (ProcV (para, exp1, dummyenv)) env in
-        dummyenv := newenv;
-        eval_exp newenv exp2
+  | LetRecExp (l, exp2) ->
+      let rec eval_letrec_list l env =
+        match l with
+          [] -> eval_exp !env exp2
+        | (id, para, exp1) :: rest ->
+            let value = ProcV (para, exp1, env) in
+            let newenv = Environment.extend id value !env in
+              env := newenv;
+              eval_letrec_list rest env
+      in
+        eval_letrec_list l (ref env)
 
 let eval_decl env = function
     Exp e -> let v = eval_exp env e in [[("-", env, v)]]
   | Decls l ->
-      let rec make_decl_list l env=
+      let rec make_decl_list l env =
      (match l with
         [] -> [[]]
       | head :: outer_rest -> 
@@ -103,10 +110,23 @@ let eval_decl env = function
                and_list :: make_decl_list outer_rest env)
       in
         make_decl_list l (ref env)
-  | RecDecl (id, para, body) -> 
-      let dummyenv = ref Environment.empty in
-      let v = ProcV (para, body, dummyenv) in
-      let newenv = Environment.extend id v env in
-        dummyenv := newenv;
-        [[(id, newenv, v)]]
+  | RecDecls l ->
+      let rec make_recdecl_list l env =
+     (match l with
+        [] -> [[]]
+      | head :: outer_rest ->
+          let rec make_andrecdecl_list l env =
+           (match l with
+              [] -> []
+            | (id, para, body) :: inner_rest ->
+                let v = ProcV (para, body, env) in
+                let newenv = Environment.extend id v !env in
+                  env := newenv;
+                  (id, newenv, v) :: make_andrecdecl_list inner_rest env)
+          in
+            let and_list = make_andrecdecl_list head env in
+              and_list :: make_recdecl_list outer_rest env)
+      in
+        make_recdecl_list l (ref env)
+                  
 

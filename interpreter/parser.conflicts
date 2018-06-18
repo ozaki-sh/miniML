@@ -1,92 +1,29 @@
 
-** Conflict (shift/reduce) in state 113.
-** Tokens involved: SEMISEMI LETAND LET
-** The following explanations concentrate on token LETAND.
+** Conflict (shift/reduce) in state 105.
+** Token involved: LETAND
 ** This state is reached from toplevel after reading:
 
-LET LetAndDecl LET ID EQ Expr 
+LET REC ID EQ FunHeadExpr 
 
 ** The derivations that appear below have the following common factor:
 ** (The question mark symbol (?) represents the spot where the derivations begin to differ.)
 
 toplevel 
-LetDecl SEMISEMI 
-LET LetAndDecl LetDecl 
-               LET LetAndDecl LetDecl 
-                   (?)
+(?)
 
-** In state 113, looking ahead at LETAND, shifting is permitted
-** because of the following sub-derivation:
-
-ID EQ Expr . LETAND LetAndDecl 
-
-** In state 113, looking ahead at LETAND, reducing production
-** LetFunExpr -> EQ Expr 
+** In state 105, looking ahead at LETAND, reducing production
+** FunExpr -> FunHeadExpr 
 ** is permitted because of the following sub-derivation:
 
-ID LetFunExpr LETAND LetAndDecl // lookahead token appears
-   EQ Expr . 
+LetRecDecl SEMISEMI 
+LET REC LetRecAndDecl LetRecDecl 
+        ID EQ FunExpr LETAND LetRecAndDecl // lookahead token appears
+              FunHeadExpr . 
 
-** Conflict (shift/reduce) in state 103.
-** Tokens involved: SEMISEMI LETAND LET IN
-** The following explanations concentrate on token LETAND.
-** This state is reached from toplevel after reading:
-
-LET ID EQ Expr 
-
-** The derivations that appear below have the following common factor:
-** (The question mark symbol (?) represents the spot where the derivations begin to differ.)
-
-toplevel 
-LetDecl SEMISEMI 
-LET LetAndDecl LetDecl 
-    (?)
-
-** In state 103, looking ahead at LETAND, shifting is permitted
+** In state 105, looking ahead at LETAND, shifting is permitted
 ** because of the following sub-derivation:
 
-ID EQ Expr . LETAND LetAndDecl 
-
-** In state 103, looking ahead at LETAND, reducing production
-** LetFunExpr -> EQ Expr 
-** is permitted because of the following sub-derivation:
-
-ID LetFunExpr LETAND LetAndDecl // lookahead token appears
-   EQ Expr . 
-
-** Conflict (shift/reduce) in state 77.
-** Tokens involved: LETAND IN
-** The following explanations concentrate on token LETAND.
-** This state is reached from toplevel after reading:
-
-LPAREN LET ID EQ Expr 
-
-** The derivations that appear below have the following common factor:
-** (The question mark symbol (?) represents the spot where the derivations begin to differ.)
-
-toplevel 
 Expr SEMISEMI 
-OrExpr 
-AndExpr 
-LTExpr 
-PMExpr LT PMExpr 
-MExpr 
-AppExpr 
-FunInfixExpr 
-AExpr 
-LPAREN Expr RPAREN 
-       LetExpr 
-       LET LetAndExpr 
-           (?)
-
-** In state 77, looking ahead at LETAND, shifting is permitted
-** because of the following sub-derivation:
-
-ID EQ Expr . LETAND LetAndExpr 
-
-** In state 77, looking ahead at LETAND, reducing production
-** LetFunExpr -> EQ Expr 
-** is permitted because of the following sub-derivation:
-
-ID LetFunExpr LETAND LetAndExpr // lookahead token appears
-   EQ Expr . 
+LetRecExpr 
+LET REC LetRecAndExpr 
+        ID EQ FunHeadExpr . LETAND LetRecAndExpr 

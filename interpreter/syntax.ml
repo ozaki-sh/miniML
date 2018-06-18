@@ -22,9 +22,9 @@ type exp =
   | FunExp of id * exp
   | DFunExp of id * exp
   | AppExp of exp * exp
-  | LetRecExp of id * id * exp * exp
+  | LetRecExp of (id * id * exp) list * exp
 
 type program = 
     Exp of exp
   | Decls of ((id * exp) list) list
-  | RecDecl of id * id * exp
+  | RecDecls of ((id * id * exp) list) list
