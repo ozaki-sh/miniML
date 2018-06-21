@@ -1,7 +1,9 @@
 (* ML interpreter / type reconstruction *)
 type id = string
 
-type binOp = Plus | Minus | Mult | Lt | And | Or
+type binOp = Plus | Minus | Mult | Lt | Eq | And | Or 
+
+type binLogicOp = And | Or
 
 type exp =
   | Var of id (* Var "x" --> x *)
@@ -9,6 +11,7 @@ type exp =
   | BLit of bool (* BLit true --> true *)
   | BinOp of binOp * exp * exp
   (* BinOp(Plus, ILit 4, Var "x") --> 4 + x *)
+  | BinLogicOp of binLogicOp * exp * exp
   | IfExp of exp * exp * exp
   (* IfExp(BinOp(Lt, Var "x", ILit 4), 
            ILit 3, 

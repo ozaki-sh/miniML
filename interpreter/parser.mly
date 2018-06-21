@@ -9,6 +9,8 @@ open Syntax
 %token LET IN EQ LETAND
 %token RARROW FUN DFUN
 %token REC
+%token MATCH WITH BAR
+%token EMPTY CONS
 
 %token <int> INTV
 %token <Syntax.id> ID
@@ -38,10 +40,10 @@ LetRecDecl :
   | LET REC d=LetRecAndDecl { [d] }
 
 LetRecAndDecl :
-    f=ID EQ fe=FunExpr LETAND d=LetRecAndDecl { match fe with FunExp (p, e) -> (f, p, e) :: d }
-  | f=ID EQ fe=FunExpr { match fe with FunExp (p, e) -> [(f, p, e)] }
+    f=ID EQ fe=FunHeadExpr LETAND d=LetRecAndDecl { match fe with FunExp (p, e) -> (f, p, e) :: d }
+  | f=ID EQ fe=FunHeadExpr { match fe with FunExp (p, e) -> [(f, p, e)] }
   | f=ID fe=LetFunHeadExpr LETAND d=LetRecAndDecl { match fe with 
-                                                          FunExp (p, e) ->(f, p, e) :: d }
+                                                      FunExp (p, e) ->(f, p, e) :: d }
   | f=ID fe=LetFunHeadExpr { match fe with FunExp (p, e) -> [(f, p, e)] }
     
 
@@ -49,19 +51,21 @@ Expr :
     e=IfExpr { e }
   | e=OrExpr { e }
   | e=LetExpr { e }
-  | e=FunExpr { e }
+  | e=FunHeadExpr { e }
+  | e=DFunHeadExpr { e }
   | e=LetRecExpr { e }
 
 OrExpr :
-    l=OrExpr OR r=AndExpr { BinOp(Or, l, r) }
+    l=OrExpr OR r=AndExpr { BinLogicOp(Or, l, r) }
   | e=AndExpr { e }
 
 AndExpr :
-    l=AndExpr AND r=LTExpr { BinOp(And, l, r) }
-  | e=LTExpr { e }
+    l=AndExpr AND r=CmpExpr { BinLogicOp(And, l, r) }
+  | e=CmpExpr { e }
 
-LTExpr : 
+CmpExpr : 
     l=PMExpr LT r=PMExpr { BinOp (Lt, l, r) }
+  | l=CmpExpr EQ r=PMExpr { BinOp (Eq, l, r) }
   | e=PMExpr { e }
 
 PMExpr :
@@ -82,8 +86,9 @@ FunInfixExpr :
   | LPAREN MINUS RPAREN { FunExp ("x", FunExp ("y", BinOp(Minus, Var "x", Var "y"))) }
   | LPAREN MULT RPAREN { FunExp ("x", FunExp ("y", BinOp(Mult, Var "x", Var "y"))) }
   | LPAREN LT RPAREN { FunExp ("x", FunExp ("y", BinOp(Lt, Var "x", Var "y"))) }
-  | LPAREN AND RPAREN { FunExp ("x", FunExp ("y", BinOp(And, Var "x", Var "y"))) }
-  | LPAREN OR RPAREN { FunExp ("x", FunExp ("y", BinOp(Or, Var "x", Var "y"))) }
+  | LPAREN EQ RPAREN { FunExp ("x", FunExp ("y", BinOp(Eq, Var "x", Var "y"))) }
+  | LPAREN AND RPAREN { FunExp ("x", FunExp ("y", BinLogicOp(And, Var "x", Var "y"))) }
+  | LPAREN OR RPAREN { FunExp ("x", FunExp ("y", BinLogicOp(Or, Var "x", Var "y"))) }
   | e=AExpr { e }
 
 AExpr :
@@ -91,6 +96,7 @@ AExpr :
   | TRUE   { BLit true }
   | FALSE  { BLit false }
   | i=ID   { Var i }
+  (*| EMPTY  { *)
   | LPAREN e=Expr RPAREN { e }
 
 IfExpr :
@@ -112,10 +118,6 @@ LetFunTailExpr :
     x=ID e=LetFunTailExpr { FunExp(x, e) }
   | EQ e=Expr { e }
 
-FunExpr :
-    e=FunHeadExpr { e }
-  | e=DFunHeadExpr { e }
- 
 FunHeadExpr :
     FUN p=ID e=FunTailExpr { FunExp (p, e) }
 
@@ -140,5 +142,8 @@ LetRecAndExpr :
   | f=ID fe=LetFunHeadExpr LETAND le=LetRecAndExpr { match fe with FunExp (p, e1) ->
                                                    let (l, e2) = le in ((f, p, e1) :: l, e2) } 
   | f=ID fe=LetFunHeadExpr IN e2=Expr { match fe with FunExp (p, e1) -> ([(f, p, e1)], e2) }
+
+(*MatchExpr :
+    MATCH e1=Expr WITH EMPTY RARROW e2=Expr BAR x1=ID CONS x2=ID RARROW e3=Expr { *)
 
 
