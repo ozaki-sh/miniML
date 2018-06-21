@@ -10,7 +10,7 @@ open Syntax
 %token RARROW FUN DFUN
 %token REC
 %token MATCH WITH BAR
-%token EMPTY CONS
+%token LSTLPRN LSTRPRN CONS SEMI
 
 %token <int> INTV
 %token <Syntax.id> ID
@@ -87,13 +87,13 @@ AppExpr :
   | e=FunInfixExpr { e }
 
 FunInfixExpr :
-    LPAREN PLUS RPAREN { FunExp ("x", FunExp ("y", BinOp(Plus, Var "x", Var "y"))) }
-  | LPAREN MINUS RPAREN { FunExp ("x", FunExp ("y", BinOp(Minus, Var "x", Var "y"))) }
-  | LPAREN MULT RPAREN { FunExp ("x", FunExp ("y", BinOp(Mult, Var "x", Var "y"))) }
-  | LPAREN LT RPAREN { FunExp ("x", FunExp ("y", BinOp(Lt, Var "x", Var "y"))) }
-  | LPAREN EQ RPAREN { FunExp ("x", FunExp ("y", BinOp(Eq, Var "x", Var "y"))) }
-  | LPAREN AND RPAREN { FunExp ("x", FunExp ("y", BinLogicOp(And, Var "x", Var "y"))) }
-  | LPAREN OR RPAREN { FunExp ("x", FunExp ("y", BinLogicOp(Or, Var "x", Var "y"))) }
+    LPAREN PLUS RPAREN { FunExp ("x", FunExp ("y", BinOp (Plus, Var "x", Var "y"))) }
+  | LPAREN MINUS RPAREN { FunExp ("x", FunExp ("y", BinOp (Minus, Var "x", Var "y"))) }
+  | LPAREN MULT RPAREN { FunExp ("x", FunExp ("y", BinOp (Mult, Var "x", Var "y"))) }
+  | LPAREN LT RPAREN { FunExp ("x", FunExp ("y", BinOp (Lt, Var "x", Var "y"))) }
+  | LPAREN EQ RPAREN { FunExp ("x", FunExp ("y", BinOp (Eq, Var "x", Var "y"))) }
+  | LPAREN AND RPAREN { FunExp ("x", FunExp ("y", BinLogicOp (And, Var "x", Var "y"))) }
+  | LPAREN OR RPAREN { FunExp ("x", FunExp ("y", BinLogicOp (Or, Var "x", Var "y"))) }
   | e=AExpr { e }
 
 AExpr :
@@ -101,8 +101,18 @@ AExpr :
   | TRUE   { BLit true }
   | FALSE  { BLit false }
   | i=ID   { Var i }
-  | EMPTY  { ListExp Emp }
+  | LSTLPRN LSTRPRN  { ListExp Emp }
+  | e=ListHeadExpr { ListExp e } 
   | LPAREN e=Expr RPAREN { e }
+
+ListHeadExpr :
+    LSTLPRN e=Expr lst=ListTailExpr { Cons (e, lst) }
+
+ListTailExpr :
+    SEMI e=Expr lst=ListTailExpr { Cons (e, lst) }
+  | LSTRPRN { Emp }
+
+
 
 IfExpr :
     IF c=Expr THEN t=Expr ELSE e=Expr { IfExp (c, t, e) } 
@@ -149,7 +159,7 @@ LetRecAndExpr :
   | f=ID fe=LetFunHeadExpr IN e2=Expr { match fe with FunExp (p, e1) -> ([(f, p, e1)], e2) }
 
 MatchExpr :
-    MATCH e1=Expr WITH EMPTY RARROW e2=Expr BAR x1=ID CONS x2=ID RARROW e3=Expr 
+    MATCH e1=Expr WITH LSTLPRN LSTRPRN RARROW e2=Expr BAR x1=ID CONS x2=ID RARROW e3=Expr 
                                                               { MatchExp (e1, e2, x1, x2, e3) }
 
 
