@@ -52,7 +52,7 @@ let rec read_eval_print env =
     | Parser.Error -> print_error_and_go "Syntax Error! at parser"
     | Failure s -> print_error_and_go ("Syntax Error! at " ^ s)
     | Sys_error s -> print_error_and_go ("File Error! " ^ s)
-    | _ -> print_error_and_go "Syntax Error! at unknown"
+    (*| _ -> print_error_and_go "Syntax Error! at unknown"*)
 
 
 let read_eval_print_from_file env filename =

@@ -54,6 +54,7 @@ Expr :
   | e=FunHeadExpr { e }
   | e=DFunHeadExpr { e }
   | e=LetRecExpr { e }
+  | e=MatchExpr { e }
 
 OrExpr :
     l=OrExpr OR r=AndExpr { BinLogicOp(Or, l, r) }
@@ -66,10 +67,10 @@ AndExpr :
 CmpExpr : 
     l=PMExpr LT r=PMExpr { BinOp (Lt, l, r) }
   | l=CmpExpr EQ r=PMExpr { BinOp (Eq, l, r) }
-  | e=PMExpr { e }
+  | e=ConsExpr { e }
 
 ConsExpr :
-    l=PMExpr CONS r=ConsExpr { BinOp (Cons, l, t) }
+    l=PMExpr CONS r=ConsExpr { BinOp (Cons, l, r) }
   | e=PMExpr { e }
 
 PMExpr :
@@ -100,7 +101,7 @@ AExpr :
   | TRUE   { BLit true }
   | FALSE  { BLit false }
   | i=ID   { Var i }
-  | EMPTY  { EmpList }
+  | EMPTY  { ListExp Emp }
   | LPAREN e=Expr RPAREN { e }
 
 IfExpr :
@@ -147,7 +148,8 @@ LetRecAndExpr :
                                                    let (l, e2) = le in ((f, p, e1) :: l, e2) } 
   | f=ID fe=LetFunHeadExpr IN e2=Expr { match fe with FunExp (p, e1) -> ([(f, p, e1)], e2) }
 
-(*MatchExpr :
-    MATCH e1=Expr WITH EMPTY RARROW e2=Expr BAR x1=ID CONS x2=ID RARROW e3=Expr { *)
+MatchExpr :
+    MATCH e1=Expr WITH EMPTY RARROW e2=Expr BAR x1=ID CONS x2=ID RARROW e3=Expr 
+                                                              { MatchExp (e1, e2, x1, x2, e3) }
 
 
