@@ -68,6 +68,10 @@ CmpExpr :
   | l=CmpExpr EQ r=PMExpr { BinOp (Eq, l, r) }
   | e=PMExpr { e }
 
+ConsExpr :
+    l=PMExpr CONS r=ConsExpr { BinOp (Cons, l, t) }
+  | e=PMExpr { e }
+
 PMExpr :
     l=PMExpr PLUS r=MExpr { BinOp (Plus, l, r) }
   | l=PMExpr MINUS r=MExpr { BinOp (Minus, l, r) }
@@ -96,7 +100,7 @@ AExpr :
   | TRUE   { BLit true }
   | FALSE  { BLit false }
   | i=ID   { Var i }
-  (*| EMPTY  { *)
+  | EMPTY  { EmpList }
   | LPAREN e=Expr RPAREN { e }
 
 IfExpr :

@@ -115,10 +115,10 @@ let read_eval_print_from_file env filename =
         inner_loop env (List.rev (get_str_list_by_semisemi 0 1 0 []))
 
 
-let initial_env = 
-  Environment.extend "i" (IntV 1)
+let initial_env = Environment.empty
+  (*Environment.extend "i" (IntV 1)
     (Environment.extend "v" (IntV 5) 
-       (Environment.extend "x" (IntV 10) Environment.empty))
+       (Environment.extend "x" (IntV 10) Environment.empty))*)
 
 let _ = 
   try let filename = Sys.argv.(1) in

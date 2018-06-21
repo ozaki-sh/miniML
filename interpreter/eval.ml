@@ -5,21 +5,32 @@ open Syntax
 (* exval は式を評価して得られる値．dnval は変数と紐付けられる値．今回
    の言語ではこの両者は同じになるが，この2つが異なる言語もある．教科書
    参照． *)
-type exval =
+type 'a exval =
   | IntV of int
   | BoolV of bool
-  | ProcV of id * exp * dnval Environment.t ref
+  | ListV of 'a list
+  | ProcV of id * exp * 'a dnval Environment.t ref
   | DProcV of id * exp
-and dnval = exval
+and 'a dnval = 'a exval
 
 exception Error of string
 
 let err s = raise (Error s)
 
+let string_of_list l =
+  let rec inner_loop l =
+    match l with
+      [] -> "]"
+    | head :: tail -> "; " ^ head ^ inner_loop tail
+  in
+    let str = inner_loop l in
+    "[" ^ String.sub str 2 (String.length str)
+
 (* pretty printing *)
 let rec string_of_exval = function
     IntV i -> string_of_int i
   | BoolV b -> string_of_bool b
+  | ListV l -> string_of_list l
   | ProcV (_, _, _) -> "<fun>"
   | DProcV (_, _) -> "<fun>"
 
@@ -37,6 +48,12 @@ let rec apply_prim op arg1 arg2 = match op, arg1, arg2 with
   | Eq, IntV i1, IntV i2 -> BoolV (i1 = i2)
   | Eq, BoolV b1, BoolV b2 -> BoolV (b1 = b2)
   | Eq, _, _ -> err ("Both arguments must have same type: =")
+  (*| Cons, IntV i, ListV l -> ListV (i :: l)
+  | Cons, BoolV b, ListV l -> ListV (b :: l)
+  | Cons, ProcV (id, body, env), ListV l -> ListV ((id, para, body) :: l)
+  | Cons, DProcV (id, body), ListV l -> ListV ((id, para, bpdy) :: l)*)
+  | Cons, _, ListV l -> ListV (arg1 :: l)
+  | Cons, _, _ -> err ("The right operand must be list: ::")
 
 let rec apply_logic_prim op arg1 exp2 env = match op, arg1 with
     And, BoolV b1 ->
@@ -62,6 +79,7 @@ and eval_exp env = function
         Environment.Not_bound -> err ("Variable not bound: " ^ x))
   | ILit i -> IntV i
   | BLit b -> BoolV b
+  | EmpList -> ListV []
   | BinOp (op, exp1, exp2) -> 
       let arg1 = eval_exp env exp1 in
       let arg2 = eval_exp env exp2 in
