@@ -160,11 +160,11 @@ and eval_exp env = function
         IntV i1 ->
           let rec search_int_pattern_and_eval = function
               [] -> err ("Not matched")
-            | (pattern, body) :: rest ->
+            | (PatternExp pattern, body) :: rest ->
                (match pattern with
                   ILit i2 -> 
                     if i1 = i2 then 
-                     (try
+                     (try 
                         eval_exp env body 
                       with MatchError -> search_int_pattern_and_eval rest)
                     else search_int_pattern_and_eval rest
@@ -179,7 +179,7 @@ and eval_exp env = function
       | BoolV b1 ->
           let rec search_bool_pattern_and_eval = function
               [] -> err ("Not matched")
-            | (pattern, body) :: rest ->
+            | (PatternExp pattern, body) :: rest ->
                (match pattern with
                   BLit b2 -> 
                     if b1 = b2 then
@@ -200,7 +200,7 @@ and eval_exp env = function
       | DProcV (_,_)  ->
           let rec search_function_pattern_and_eval = function
               [] -> err ("Not matched")
-            | (pattern, body) :: rest ->
+            | (PatternExp pattern, body) :: rest ->
                (match pattern with
                   Var x ->
                     let newenv = Environment.extend x value env in
@@ -213,7 +213,7 @@ and eval_exp env = function
       | ListV l ->
           let rec search_list_pattern_and_eval = function
               [] -> err ("Not matched")
-            | (pattern, body) :: rest ->
+            | (PatternExp pattern, body) :: rest ->
                (match pattern with
                   Var x ->
                     let newenv = Environment.extend x value env in
@@ -250,17 +250,17 @@ and eval_exp env = function
       let value = eval_exp env exp in
       match value with
         IntV i1 ->
-          let [(pattern, body)] = one_element_list in
+          let [(PatternExp pattern, body)] = one_element_list in
          (match pattern with
             ILit i2 -> 
               if i1 = i2 then eval_exp env body 
               else raise MatchError
           | Var x ->
               let newenv = Environment.extend x value env in
-               eval_exp newenv body
+              eval_exp newenv body
           | _ -> raise MatchError)
       | BoolV b1 ->
-          let [(pattern, body)] = one_element_list in
+          let [(PatternExp pattern, body)] = one_element_list in
          (match pattern with
             BLit b2 -> 
               if b1 = b2 then eval_exp env body 
@@ -271,14 +271,14 @@ and eval_exp env = function
           | _ -> raise MatchError)
       | ProcV (_,_,_) 
       | DProcV (_,_)  ->
-          let [(pattern, body)] = one_element_list in
+          let [(PatternExp pattern, body)] = one_element_list in
          (match pattern with
           | Var x ->
               let newenv = Environment.extend x value env in
                eval_exp newenv body
           | _ -> raise MatchError)
       | ListV l ->
-          let [(pattern, body)] = one_element_list in
+          let [(PatternExp pattern, body)] = one_element_list in
          (match pattern with
             Var x ->
               let newenv = Environment.extend x value env in

@@ -162,26 +162,30 @@ LetRecAndExpr :
 
 MatchExpr :
     MATCH e1=Expr e2=list(MoreExpr) WITH e3=PatternMatchExpr {
-      let rec make_matchexp exps patterns_and_bodies =
-        match exps with
-          [] -> 
-            let rec unfold_singleton l =
-              match l with
-                [] -> []
-              | ([singleton], body) :: rest -> (singleton, body) :: unfold_singleton rest
-            in
-              unfold_singleton patterns_and_bodies
-        | exphead :: exprest ->
-           (match patterns_and_bodies with
+      let rec make_part_of_matchexp exps patterns_and_bodies =
+        if exps = [] then
+          let rec unfold_singleton = function
+            [] -> []
+          | ([singleton], body) :: rest ->
+              (singleton, body) :: unfold_singleton rest
+          in
+            unfold_singleton patterns_and_bodies
+        else
+          let rec main_loop exps = function
               [] -> []
-            | (patterns, body) :: tuplerest ->
-                let tuple = (match patterns with
-                               [pattern] -> (exphead, body)
-                             | head :: patternrest -> 
-                                (head, MatchOneExp (exphead, make_matchexp exprest [(patternrest, body)])))  in
-                tuple :: make_matchexp exps tuplerest)
+            | head :: rest ->
+                let (patterns, body) = head in
+               (match patterns with
+                  [pattern] -> [(pattern, body)]
+                | pattern_head :: pattern_rest ->
+                    let exp_head :: exp_rest = exps in
+                    (pattern_head, MatchOneExp (exp_head, main_loop exp_rest [(pattern_rest, body)]))
+                    ::
+                    main_loop exps rest)
+          in
+            main_loop exps patterns_and_bodies
       in
-        let matchlist = make_matchexp e2 e3 in
+        let matchlist = make_part_of_matchexp e2 e3 in
         MatchExp (e1, matchlist) }
 
   
