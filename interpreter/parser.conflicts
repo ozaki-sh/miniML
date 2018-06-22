@@ -1,0 +1,72 @@
+
+** Conflict (shift/reduce) in state 148.
+** Token involved: BAR
+** This state is reached from toplevel after reading:
+
+MATCH Expr list(MoreExpr) WITH Patterns RARROW MATCH Expr list(MoreExpr) WITH Patterns RARROW Expr MorePatternMatchExpr 
+
+** The derivations that appear below have the following common factor:
+** (The question mark symbol (?) represents the spot where the derivations begin to differ.)
+
+toplevel 
+Expr SEMISEMI 
+MatchExpr 
+MATCH Expr list(MoreExpr) WITH PatternMatchExpr 
+                               (?)
+
+** In state 148, looking ahead at BAR, shifting is permitted
+** because of the following sub-derivation:
+
+Patterns RARROW Expr list(MorePatternMatchExpr) 
+                MatchExpr 
+                MATCH Expr list(MoreExpr) WITH PatternMatchExpr 
+                                               Patterns RARROW Expr list(MorePatternMatchExpr) 
+                                                                    MorePatternMatchExpr list(MorePatternMatchExpr) 
+                                                                                         MorePatternMatchExpr list(MorePatternMatchExpr) 
+                                                                                         . BAR Patterns RARROW Expr 
+
+** In state 148, looking ahead at BAR, reducing production
+** list(MorePatternMatchExpr) -> 
+** is permitted because of the following sub-derivation:
+
+Patterns RARROW Expr list(MorePatternMatchExpr) // lookahead token appears because list(MorePatternMatchExpr) can begin with BAR
+                MatchExpr // lookahead token is inherited
+                MATCH Expr list(MoreExpr) WITH PatternMatchExpr // lookahead token is inherited
+                                               Patterns RARROW Expr list(MorePatternMatchExpr) // lookahead token is inherited
+                                                                    MorePatternMatchExpr list(MorePatternMatchExpr) // lookahead token is inherited
+                                                                                         . 
+
+** Conflict (shift/reduce) in state 136.
+** Token involved: BAR
+** This state is reached from toplevel after reading:
+
+MATCH Expr list(MoreExpr) WITH Patterns RARROW MATCH Expr list(MoreExpr) WITH Patterns RARROW Expr 
+
+** The derivations that appear below have the following common factor:
+** (The question mark symbol (?) represents the spot where the derivations begin to differ.)
+
+toplevel 
+Expr SEMISEMI 
+MatchExpr 
+MATCH Expr list(MoreExpr) WITH PatternMatchExpr 
+                               (?)
+
+** In state 136, looking ahead at BAR, shifting is permitted
+** because of the following sub-derivation:
+
+Patterns RARROW Expr list(MorePatternMatchExpr) 
+                MatchExpr 
+                MATCH Expr list(MoreExpr) WITH PatternMatchExpr 
+                                               Patterns RARROW Expr list(MorePatternMatchExpr) 
+                                                                    MorePatternMatchExpr list(MorePatternMatchExpr) 
+                                                                    . BAR Patterns RARROW Expr 
+
+** In state 136, looking ahead at BAR, reducing production
+** list(MorePatternMatchExpr) -> 
+** is permitted because of the following sub-derivation:
+
+Patterns RARROW Expr list(MorePatternMatchExpr) // lookahead token appears because list(MorePatternMatchExpr) can begin with BAR
+                MatchExpr // lookahead token is inherited
+                MATCH Expr list(MoreExpr) WITH PatternMatchExpr // lookahead token is inherited
+                                               Patterns RARROW Expr list(MorePatternMatchExpr) // lookahead token is inherited
+                                                                    . 

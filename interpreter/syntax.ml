@@ -30,7 +30,9 @@ type exp =
   | AppExp of exp * exp
   | LetRecExp of (id * id * exp) list * exp
   | ListExp of listExp
-  | MatchExp of exp * exp * id * id * exp
+  | MatchExp of exp * (exp * exp) list
+  | MatchOneExp of exp * (exp * exp) list
+  | PatternExp of exp
 and listExp = Emp | Cons of exp * listExp
 
 type program = 

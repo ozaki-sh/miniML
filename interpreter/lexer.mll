@@ -13,6 +13,7 @@ let reservedWords = [
   ("rec", Parser.REC);
   ("then", Parser.THEN);
   ("true", Parser.TRUE);
+  ("when", Parser.WHEN);
   ("with", Parser.WITH);
 ] 
 }
@@ -42,6 +43,7 @@ rule main = parse
 | "::" { Parser.CONS }
 | "|" { Parser.BAR }
 | ";" { Parser.SEMI }
+| "," { Parser.COMMA }
 
 | ['a'-'z'] ['a'-'z' '0'-'9' '_' '\'']*
     { let id = Lexing.lexeme lexbuf in

@@ -11,6 +11,8 @@ open Syntax
 %token REC
 %token MATCH WITH BAR
 %token LSTLPRN LSTRPRN CONS SEMI
+%token WHEN
+%token COMMA
 
 %token <int> INTV
 %token <Syntax.id> ID
@@ -25,7 +27,7 @@ toplevel :
   | d=LetRecDecl SEMISEMI { RecDecls d }
 
 LetDecl :
-  | LET d1=LetAndDecl d2=LetDecl { d1 :: d2 }
+    LET d1=LetAndDecl d2=LetDecl { d1 :: d2 }
   | LET d=LetAndDecl { [d] }
 
 LetAndDecl :
@@ -36,7 +38,7 @@ LetAndDecl :
   | f=ID fe=LetFunHeadExpr { match fe with FunExp (p, e) -> [(f, FunExp (p, e))] }
 
 LetRecDecl :
-  | LET REC d1=LetRecAndDecl d2=LetRecDecl { d1 :: d2 }
+    LET REC d1=LetRecAndDecl d2=LetRecDecl { d1 :: d2 }
   | LET REC d=LetRecAndDecl { [d] }
 
 LetRecAndDecl :
@@ -155,11 +157,59 @@ LetRecAndExpr :
                                                        let (l, e2) = le in ((f, p, e1) :: l, e2) } 
   | f=ID EQ fe=FunHeadExpr IN e2=Expr { match fe with FunExp (p, e1) -> ([(f, p, e1)], e2) }
   | f=ID fe=LetFunHeadExpr LETAND le=LetRecAndExpr { match fe with FunExp (p, e1) ->
-                                                   let (l, e2) = le in ((f, p, e1) :: l, e2) } 
+                                                       let (l, e2) = le in ((f, p, e1) :: l, e2) } 
   | f=ID fe=LetFunHeadExpr IN e2=Expr { match fe with FunExp (p, e1) -> ([(f, p, e1)], e2) }
 
 MatchExpr :
-    MATCH e1=Expr WITH LSTLPRN LSTRPRN RARROW e2=Expr BAR x1=ID CONS x2=ID RARROW e3=Expr 
-                                                              { MatchExp (e1, e2, x1, x2, e3) }
+    MATCH e1=Expr e2=list(MoreExpr) WITH e3=PatternMatchExpr {
+      let rec make_matchexp exps patterns_and_bodies =
+        match exps with
+          [] -> 
+            let rec unfold_singleton l =
+              match l with
+                [] -> []
+              | ([singleton], body) :: rest -> (singleton, body) :: unfold_singleton rest
+            in
+              unfold_singleton patterns_and_bodies
+        | exphead :: exprest ->
+           (match patterns_and_bodies with
+              [] -> []
+            | (patterns, body) :: tuplerest ->
+                let tuple = (match patterns with
+                               [pattern] -> (exphead, body)
+                             | head :: patternrest -> 
+                                (head, MatchOneExp (exphead, make_matchexp exprest [(patternrest, body)])))  in
+                tuple :: make_matchexp exps tuplerest)
+      in
+        let matchlist = make_matchexp e2 e3 in
+        MatchExp (e1, matchlist) }
+
+  
+
+MoreExpr :
+    COMMA e=Expr { e }
+
+Pattern :
+    i=INTV                { PatternExp (ILit i) }
+  | TRUE                  { PatternExp (BLit true) }
+  | FALSE                 { PatternExp (BLit false) }
+  | x=ID                  { PatternExp (Var x) }
+  | LSTLPRN LSTRPRN       { PatternExp (ListExp Emp) }
+  | LSTLPRN x=ID LSTRPRN  { PatternExp (ListExp (Cons (Var x, Emp))) }
+  | x1=ID CONS x2=ID      { PatternExp (ListExp (Cons (Var x1, Cons (Var x2, Emp)))) }
+
+PatternMatchExpr :
+    pt=Patterns RARROW e1=Expr e2=list(MorePatternMatchExpr) { (pt, e1) :: e2 }
+
+MorePatternMatchExpr :
+    BAR pt=Patterns RARROW e=Expr { (pt, e) }
+
+Patterns :
+    pt=Pattern pts=list(MorePattern) { pt :: pts }
+
+MorePattern :
+    COMMA pt=Pattern { pt }
+
+
 
 
