@@ -194,14 +194,14 @@ MoreExpr :
     COMMA e=Expr { e }
 
 Pattern :
-    i=INTV                      { PatternExp (ILit i) }
-  | TRUE                        { PatternExp (BLit true) }
-  | FALSE                       { PatternExp (BLit false) }
-  | x=ID                        { PatternExp (Var x) }
-  | LSTLPRN LSTRPRN             { PatternExp (ListExp Emp) }
-  | LSTLPRN p=Pattern LSTRPRN   { PatternExp (ListExp (Cons (p, Emp))) }
-  | p1=Pattern CONS p2=Pattern  { PatternExp (ListExp (Cons (p1, Cons (p2, Emp)))) }
-  | UNDERSCORE                  { PatternExp (Underscore) }
+    i=INTV                        { PatternExp (ILit i) }
+  | TRUE                          { PatternExp (BLit true) }
+  | FALSE                         { PatternExp (BLit false) }
+  | x=ID                          { PatternExp (Var x) }
+  | LSTLPRN LSTRPRN               { PatternExp (ListExp Emp) }
+  | LSTLPRN pt=Pattern LSTRPRN    { PatternExp (ListExp (Cons (pt, Emp))) }
+  | pt1=Pattern CONS pt2=Pattern  { PatternExp (ListExp (Cons (pt1, Cons (pt2, Emp)))) }
+  | UNDERSCORE                    { PatternExp (Wildcard) }
 
 PatternMatchExpr :
     pt=Patterns RARROW e1=Expr e2=list(MorePatternMatchExpr) { (pt, e1) :: e2 }

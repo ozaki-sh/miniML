@@ -33,7 +33,7 @@ type exp =
   | MatchExp of exp * (exp * exp) list
  (* | MatchOneExp of exp * (exp * exp) list*)
   | PatternExp of exp
-  | Underscore
+  | Wildcard
 and listExp = Emp | Cons of exp * listExp
 
 type program = 

@@ -47,30 +47,20 @@ let rec string_of_exval = function
   | ListV l -> string_of_list l
 let pp_val v = print_string (string_of_exval v)
 
-let rec pattern_match value (PatternExp pattern) =
-  match pattern with
-    ILit i1 ->
-     (match value with
-        IntV i2 when (i1 = i2) -> []
-      | _ -> raise MatchError)
-  | BLit b1 ->
-     (match value with
-        BoolV b2 when (b1 = b2) -> []
-      | _ -> raise MatchError)
-  | Var x -> [(x, value)]
-  | ListExp Emp ->
-     (match value with
-        ListV EmpV -> []
-      | _ -> raise MatchError)
-  | ListExp (Cons (pt, Emp)) ->
-     (match value with
-        ListV (ConsV (v, EmpV)) -> pattern_match v pt
-      | _ -> raise MatchError)
-  | ListExp (Cons (pt1, Cons (pt2, Emp))) ->
-     (match value with
-        ListV (ConsV (v, l)) -> List.append (pattern_match v pt1) (pattern_match (ListV l) pt2)
-      | _ -> raise MatchError)
-  | Underscore -> []
+let rec pattern_match (PatternExp pattern) value =
+  match pattern, value with
+    ILit i1, IntV i2 when (i1 = i2) -> []
+  | BLit b1, BoolV b2 when (b1 = b2) -> []
+  | Var x, _ -> [(x, value)]
+  | ListExp Emp, ListV EmpV -> []
+  | ListExp (Cons (pt, Emp)), ListV (ConsV (v, EmpV))
+      -> pattern_match pt v
+  | ListExp (Cons (pt1, Cons (pt2, Emp))), ListV (ConsV (v, l))
+      -> List.append (pattern_match pt1 v) (pattern_match pt2 (ListV l))
+  | Wildcard, _ -> []
+  | _, _ -> raise MatchError
+
+
 
 let rec apply_prim op arg1 arg2 = match op, arg1, arg2 with
     Plus, IntV i1, IntV i2 -> IntV (i1 + i2)
@@ -120,10 +110,6 @@ and eval_exp env = function
   | BinLogicOp (op, exp1, exp2) ->
       let arg1 = eval_exp env exp1 in
       apply_logic_prim op arg1 exp2 env
-  (*| BinListOp (op, exp1, exp2) ->
-      let arg1 = eval_exp env exp1 in
-      let arg2 = eval_exp env exp2 in
-      apply_list_prim op arg1 arg2*)
   | IfExp (exp1, exp2, exp3) ->
       let test = eval_exp env exp1 in
         (match test with
@@ -198,7 +184,7 @@ and eval_exp env = function
                   bind newenv rest
             in
               try
-                let id_and_value_list = pattern_match value pattern in
+                let id_and_value_list = pattern_match pattern value in
                 if check_duplication id_and_value_list [] then
                   err ("one variable is bound several times in this expression")
                 else
