@@ -161,7 +161,7 @@ LetRecAndExpr :
   | f=ID fe=LetFunHeadExpr IN e2=Expr { match fe with FunExp (p, e1) -> ([(f, p, e1)], e2) }
 
 MatchExpr :
-    MATCH e1=Expr e2=list(MoreExpr) WITH e3=PatternMatchExpr {
+    MATCH e1=Expr e2=list(MoreExpr) WITH option(BAR) e3=PatternMatchExpr {
       let rec make_part_of_matchexp exps patterns_and_bodies =
         if exps = [] then
           let rec unfold_singleton = function
