@@ -58,30 +58,46 @@ Expr :
   | e=LetRecExpr { e }
   | e=MatchExpr { e }
 
+LookRightExpr :
+    e=IfExpr { e }
+  | e=LetExpr { e }
+  | e=FunHeadExpr { e }
+  | e=DFunHeadExpr { e }
+  | e=LetRecExpr { e }
+  | e=MatchExpr { e }
+
 OrExpr :
     l=OrExpr OR r=AndExpr { BinLogicOp(Or, l, r) }
+  | l=OrExpr OR r=LookRightExpr { BinLogicOp(Or, l, r) }
   | e=AndExpr { e }
 
 AndExpr :
     l=AndExpr AND r=CmpExpr { BinLogicOp(And, l, r) }
+  | l=AndExpr AND r=LookRightExpr { BinLogicOp(And, l, r) }
   | e=CmpExpr { e }
 
 CmpExpr : 
     l=PMExpr LT r=PMExpr { BinOp (Lt, l, r) }
+  | l=PMExpr LT r=LookRightExpr { BinOp (Lt, l, r) }
   | l=CmpExpr EQ r=PMExpr { BinOp (Eq, l, r) }
+  | l=CmpExpr EQ r=LookRightExpr { BinOp (Eq, l, r) }
   | e=ConsExpr { e }
 
 ConsExpr :
     l=PMExpr CONS r=ConsExpr { BinOp (Cons, l, r) }
+  | l=PMExpr CONS r=LookRightExpr { BinOp (Cons, l, r) }
   | e=PMExpr { e }
 
 PMExpr :
     l=PMExpr PLUS r=MExpr { BinOp (Plus, l, r) }
+  | l=PMExpr PLUS r=LookRightExpr { BinOp (Plus, l, r) }
   | l=PMExpr MINUS r=MExpr { BinOp (Minus, l, r) }
+  | l=PMExpr MINUS r=LookRightExpr { BinOp (Minus, l, r) }
   | e=MExpr { e }
 
 MExpr : 
     l=MExpr MULT r=AppExpr { BinOp (Mult, l, r) }
+  | l=MExpr MULT r=LookRightExpr { BinOp (Mult, l, r) }
   | e=AppExpr { e }
 
 AppExpr :
@@ -163,9 +179,7 @@ LetRecAndExpr :
 MatchExpr :
     MATCH e1=Expr e2=list(MoreExpr) WITH option(BAR) e3=PatternMatchExpr { 
       MatchExp (e1 :: e2, e3) }
-
-  
-
+ 
 MoreExpr :
     COMMA e=Expr { e }
 
@@ -191,7 +205,6 @@ PatternMatchExpr :
         | head :: rest -> (head, e1) :: link_pattern_with_body_andthen_cons rest
       in
         link_pattern_with_body_andthen_cons pts }
-
 
 MorePatternMatchExpr :
     BAR pt=Patterns pts=list(MorePatterns) RARROW e=Expr { 
