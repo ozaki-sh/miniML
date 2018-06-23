@@ -137,7 +137,7 @@ and eval_exp env = function
           [] -> eval_exp !env exp2
         | (id, para, exp1) :: rest ->
             if List.exists (fun x -> x = id) id_l then
-              err (| Underscore -> eval_exp env body)
+              err ("one variable is bound several times in this expression")
             else
               let value = ProcV (para, exp1, env) in
               let newenv = Environment.extend id value !env in
@@ -239,8 +239,8 @@ and eval_exp env = function
                         with MatchError -> search_list_pattern_and_eval rest
                     | _ -> search_list_pattern_and_eval rest)
                 | ListExp (Cons (Var x1, Cons (Var x2, Emp))) ->
-                   if x1 = x2 then err ("one variable is bound several times in this expression")
-                   else
+                    if x1 = x2 then err ("one variable is bound several times in this expression")
+                    else
                      (match l with
                         ConsV (v1, v2) ->
                           let newenv = Environment.extend x1 v1 env in
