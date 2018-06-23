@@ -1,5 +1,6 @@
-let f x y =
-  match x, y with
-    0, 1 -> 0
-  | 2, 3 -> 1
-  | 4, 5 -> 2;;
+let l = [1;2;3];;
+
+let rec add l =
+  match l with
+    [] -> 0
+  | h :: t -> h + (add t);;

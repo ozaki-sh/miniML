@@ -223,9 +223,9 @@ and eval_exp env = function
                 | ListExp Emp ->
                    (match l with
                       EmpV -> 
-                        try
+                       (try
                           eval_exp env body
-                        with MatchError -> search_list_pattern_and_eval rest
+                        with MatchError -> search_list_pattern_and_eval rest)
                     | _ -> search_list_pattern_and_eval rest)
                 | ListExp (Cons (Var x, Emp)) ->
                    (match l with
