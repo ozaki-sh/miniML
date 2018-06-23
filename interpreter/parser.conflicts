@@ -1,5 +1,5 @@
 
-** Conflict (shift/reduce) in state 168.
+** Conflict (shift/reduce) in state 161.
 ** Token involved: BAR
 ** This state is reached from toplevel after reading:
 
@@ -14,7 +14,7 @@ MatchExpr
 MATCH Expr list(MoreExpr) WITH option(BAR) PatternMatchExpr 
                                            (?)
 
-** In state 168, looking ahead at BAR, shifting is permitted
+** In state 161, looking ahead at BAR, shifting is permitted
 ** because of the following sub-derivation:
 
 Patterns list(MorePatterns) RARROW Expr list(MorePatternMatchExpr) 
@@ -25,7 +25,7 @@ Patterns list(MorePatterns) RARROW Expr list(MorePatternMatchExpr)
                                                                                                                                            MorePatternMatchExpr list(MorePatternMatchExpr) 
                                                                                                                                            . BAR Patterns list(MorePatterns) RARROW Expr 
 
-** In state 168, looking ahead at BAR, reducing production
+** In state 161, looking ahead at BAR, reducing production
 ** list(MorePatternMatchExpr) -> 
 ** is permitted because of the following sub-derivation:
 
@@ -36,7 +36,7 @@ Patterns list(MorePatterns) RARROW Expr list(MorePatternMatchExpr) // lookahead 
                                                                                                                       MorePatternMatchExpr list(MorePatternMatchExpr) // lookahead token is inherited
                                                                                                                                            . 
 
-** Conflict (shift/reduce) in state 159.
+** Conflict (shift/reduce) in state 152.
 ** Token involved: BAR
 ** This state is reached from toplevel after reading:
 
@@ -51,7 +51,7 @@ MatchExpr
 MATCH Expr list(MoreExpr) WITH option(BAR) PatternMatchExpr 
                                            (?)
 
-** In state 159, looking ahead at BAR, shifting is permitted
+** In state 152, looking ahead at BAR, shifting is permitted
 ** because of the following sub-derivation:
 
 Patterns list(MorePatterns) RARROW Expr list(MorePatternMatchExpr) 
@@ -61,7 +61,7 @@ Patterns list(MorePatterns) RARROW Expr list(MorePatternMatchExpr)
                                                                                                                       MorePatternMatchExpr list(MorePatternMatchExpr) 
                                                                                                                       . BAR Patterns list(MorePatterns) RARROW Expr 
 
-** In state 159, looking ahead at BAR, reducing production
+** In state 152, looking ahead at BAR, reducing production
 ** list(MorePatternMatchExpr) -> 
 ** is permitted because of the following sub-derivation:
 
@@ -71,11 +71,11 @@ Patterns list(MorePatterns) RARROW Expr list(MorePatternMatchExpr) // lookahead 
                                                                               Patterns list(MorePatterns) RARROW Expr list(MorePatternMatchExpr) // lookahead token is inherited
                                                                                                                       . 
 
-** Conflict (reduce/reduce) in state 144.
+** Conflict (shift/reduce) in state 137.
 ** Token involved: CONS
 ** This state is reached from toplevel after reading:
 
-MATCH Expr list(MoreExpr) WITH option(BAR) Pattern CONS Pattern CONS ListPattern 
+MATCH Expr list(MoreExpr) WITH option(BAR) Pattern CONS Pattern 
 
 ** The derivations that appear below have the following common factor:
 ** (The question mark symbol (?) represents the spot where the derivations begin to differ.)
@@ -88,85 +88,15 @@ MATCH Expr list(MoreExpr) WITH option(BAR) PatternMatchExpr
                                            Pattern list(MorePattern) 
                                            (?)
 
-** In state 144, looking ahead at CONS, reducing production
-** ListPattern -> Pattern CONS ListPattern 
+** In state 137, looking ahead at CONS, shifting is permitted
+** because of the following sub-derivation:
+
+Pattern CONS Pattern 
+             Pattern . CONS Pattern 
+
+** In state 137, looking ahead at CONS, reducing production
+** Pattern -> Pattern CONS Pattern 
 ** is permitted because of the following sub-derivation:
 
-Pattern CONS ListPattern // lookahead token appears
-Pattern CONS ListPattern // lookahead token is inherited
-             Pattern CONS ListPattern . 
-
-** In state 144, looking ahead at CONS, reducing production
-** Pattern -> Pattern CONS ListPattern 
-** is permitted because of the following sub-derivation:
-
-Pattern CONS ListPattern 
-             Pattern CONS ListPattern // lookahead token appears
-             Pattern CONS ListPattern . 
-
-** Conflict (reduce/reduce) in state 140.
-** Token involved: CONS
-** This state is reached from toplevel after reading:
-
-MATCH Expr list(MoreExpr) WITH option(BAR) Pattern CONS LSTLPRN Pattern LSTRPRN 
-
-** The derivations that appear below have the following common factor:
-** (The question mark symbol (?) represents the spot where the derivations begin to differ.)
-
-toplevel 
-Expr SEMISEMI 
-MatchExpr 
-MATCH Expr list(MoreExpr) WITH option(BAR) PatternMatchExpr 
-                                           Patterns list(MorePatterns) RARROW Expr list(MorePatternMatchExpr) 
-                                           Pattern list(MorePattern) 
-                                           (?)
-
-** In state 140, looking ahead at CONS, reducing production
-** ListPattern -> LSTLPRN Pattern LSTRPRN 
-** is permitted because of the following sub-derivation:
-
-Pattern CONS ListPattern // lookahead token appears
-Pattern CONS ListPattern // lookahead token is inherited
-             LSTLPRN Pattern LSTRPRN . 
-
-** In state 140, looking ahead at CONS, reducing production
-** Pattern -> LSTLPRN Pattern LSTRPRN 
-** is permitted because of the following sub-derivation:
-
-Pattern CONS ListPattern 
-             Pattern CONS ListPattern // lookahead token appears
-             LSTLPRN Pattern LSTRPRN . 
-
-** Conflict (reduce/reduce) in state 138.
-** Token involved: CONS
-** This state is reached from toplevel after reading:
-
-MATCH Expr list(MoreExpr) WITH option(BAR) Pattern CONS LSTLPRN LSTRPRN 
-
-** The derivations that appear below have the following common factor:
-** (The question mark symbol (?) represents the spot where the derivations begin to differ.)
-
-toplevel 
-Expr SEMISEMI 
-MatchExpr 
-MATCH Expr list(MoreExpr) WITH option(BAR) PatternMatchExpr 
-                                           Patterns list(MorePatterns) RARROW Expr list(MorePatternMatchExpr) 
-                                           Pattern list(MorePattern) 
-                                           (?)
-
-** In state 138, looking ahead at CONS, reducing production
-** APattern -> LSTLPRN LSTRPRN 
-** is permitted because of the following sub-derivation:
-
-Pattern CONS ListPattern 
-             Pattern CONS ListPattern // lookahead token appears
-             APattern // lookahead token is inherited
-             LSTLPRN LSTRPRN . 
-
-** In state 138, looking ahead at CONS, reducing production
-** ListPattern -> LSTLPRN LSTRPRN 
-** is permitted because of the following sub-derivation:
-
-Pattern CONS ListPattern // lookahead token appears
-Pattern CONS ListPattern // lookahead token is inherited
-             LSTLPRN LSTRPRN . 
+Pattern CONS Pattern // lookahead token appears
+Pattern CONS Pattern . 
