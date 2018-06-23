@@ -1,5 +1,5 @@
 
-** Conflict (shift/reduce) in state 148.
+** Conflict (shift/reduce) in state 149.
 ** Token involved: BAR
 ** This state is reached from toplevel after reading:
 
@@ -14,7 +14,7 @@ MatchExpr
 MATCH Expr list(MoreExpr) WITH PatternMatchExpr 
                                (?)
 
-** In state 148, looking ahead at BAR, shifting is permitted
+** In state 149, looking ahead at BAR, shifting is permitted
 ** because of the following sub-derivation:
 
 Patterns RARROW Expr list(MorePatternMatchExpr) 
@@ -25,7 +25,7 @@ Patterns RARROW Expr list(MorePatternMatchExpr)
                                                                                          MorePatternMatchExpr list(MorePatternMatchExpr) 
                                                                                          . BAR Patterns RARROW Expr 
 
-** In state 148, looking ahead at BAR, reducing production
+** In state 149, looking ahead at BAR, reducing production
 ** list(MorePatternMatchExpr) -> 
 ** is permitted because of the following sub-derivation:
 
@@ -36,7 +36,7 @@ Patterns RARROW Expr list(MorePatternMatchExpr) // lookahead token appears becau
                                                                     MorePatternMatchExpr list(MorePatternMatchExpr) // lookahead token is inherited
                                                                                          . 
 
-** Conflict (shift/reduce) in state 136.
+** Conflict (shift/reduce) in state 137.
 ** Token involved: BAR
 ** This state is reached from toplevel after reading:
 
@@ -51,7 +51,7 @@ MatchExpr
 MATCH Expr list(MoreExpr) WITH PatternMatchExpr 
                                (?)
 
-** In state 136, looking ahead at BAR, shifting is permitted
+** In state 137, looking ahead at BAR, shifting is permitted
 ** because of the following sub-derivation:
 
 Patterns RARROW Expr list(MorePatternMatchExpr) 
@@ -61,7 +61,7 @@ Patterns RARROW Expr list(MorePatternMatchExpr)
                                                                     MorePatternMatchExpr list(MorePatternMatchExpr) 
                                                                     . BAR Patterns RARROW Expr 
 
-** In state 136, looking ahead at BAR, reducing production
+** In state 137, looking ahead at BAR, reducing production
 ** list(MorePatternMatchExpr) -> 
 ** is permitted because of the following sub-derivation:
 

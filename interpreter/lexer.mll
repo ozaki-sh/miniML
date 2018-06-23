@@ -44,6 +44,7 @@ rule main = parse
 | "|" { Parser.BAR }
 | ";" { Parser.SEMI }
 | "," { Parser.COMMA }
+| "_" { Parser.UNDERSCORE }
 
 | ['a'-'z'] ['a'-'z' '0'-'9' '_' '\'']*
     { let id = Lexing.lexeme lexbuf in

@@ -12,7 +12,7 @@ open Syntax
 %token MATCH WITH BAR
 %token LSTLPRN LSTRPRN CONS SEMI
 %token WHEN
-%token COMMA
+%token COMMA UNDERSCORE
 
 %token <int> INTV
 %token <Syntax.id> ID
@@ -201,6 +201,7 @@ Pattern :
   | LSTLPRN LSTRPRN       { PatternExp (ListExp Emp) }
   | LSTLPRN x=ID LSTRPRN  { PatternExp (ListExp (Cons (Var x, Emp))) }
   | x1=ID CONS x2=ID      { PatternExp (ListExp (Cons (Var x1, Cons (Var x2, Emp)))) }
+  | UNDERSCORE            { PatternExp (Underscore) }
 
 PatternMatchExpr :
     pt=Patterns RARROW e1=Expr e2=list(MorePatternMatchExpr) { (pt, e1) :: e2 }

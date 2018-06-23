@@ -173,6 +173,7 @@ and eval_exp env = function
                    (try
                       eval_exp newenv body
                     with MatchError -> search_int_pattern_and_eval rest)
+                | Underscore -> eval_exp env body
                 | _ -> search_int_pattern_and_eval rest)
           in
             search_int_pattern_and_eval pattern_and_body_list
@@ -192,6 +193,7 @@ and eval_exp env = function
                    (try
                       eval_exp newenv body
                     with MatchError -> search_bool_pattern_and_eval rest)
+                | Underscore -> eval_exp env body
                 | _ -> search_bool_pattern_and_eval rest)
           in
             search_bool_pattern_and_eval pattern_and_body_list
@@ -207,6 +209,7 @@ and eval_exp env = function
                    (try
                       eval_exp newenv body
                     with MatchError -> search_function_pattern_and_eval rest)
+                | Underscore -> eval_exp env body
                 | _ -> search_function_pattern_and_eval rest)
           in
             search_function_pattern_and_eval pattern_and_body_list
@@ -243,7 +246,9 @@ and eval_exp env = function
                         try
                           eval_exp newerenv body
                         with MatchError -> search_list_pattern_and_eval rest
-                    | _ -> search_list_pattern_and_eval rest))
+                    | _ -> search_list_pattern_and_eval rest)
+                | Underscore -> eval_exp env body
+                | _ -> search_list_pattern_and_eval rest)
           in
             search_list_pattern_and_eval pattern_and_body_list)
   | MatchOneExp (exp, one_element_list) ->
@@ -258,6 +263,7 @@ and eval_exp env = function
           | Var x ->
               let newenv = Environment.extend x value env in
               eval_exp newenv body
+          | Underscore -> eval_exp env body
           | _ -> raise MatchError)
       | BoolV b1 ->
           let [(PatternExp pattern, body)] = one_element_list in
@@ -268,6 +274,7 @@ and eval_exp env = function
           | Var x ->
               let newenv = Environment.extend x value env in
                eval_exp newenv body
+          | Underscore -> eval_exp env body
           | _ -> raise MatchError)
       | ProcV (_,_,_) 
       | DProcV (_,_)  ->
@@ -276,6 +283,7 @@ and eval_exp env = function
           | Var x ->
               let newenv = Environment.extend x value env in
                eval_exp newenv body
+          | Underscore -> eval_exp env body
           | _ -> raise MatchError)
       | ListV l ->
           let [(PatternExp pattern, body)] = one_element_list in
@@ -299,7 +307,9 @@ and eval_exp env = function
                   let newenv = Environment.extend x1 v1 env in
                   let newerenv = Environment.extend x2 (ListV v2) newenv in
                   eval_exp newerenv body
-              | _ -> raise MatchError))
+              | _ -> raise MatchError)
+          | Underscore -> eval_exp env body
+          | _ -> raise MatchError)
 
                            
 
