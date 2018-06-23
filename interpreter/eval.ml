@@ -14,6 +14,7 @@ type exval =
 and listval = EmpV | ConsV of exval * listval
 and dnval = exval
 
+
 exception Error of string
 exception InnerMatchError
 exception MatchError
@@ -28,8 +29,8 @@ let rec string_of_list l =
        (match head with
           IntV i -> "; " ^ (string_of_int i) ^ (inner_loop tail)
         | BoolV b -> "; " ^ (string_of_bool b) ^ (inner_loop tail)
-        | ProcV (_,_,_) -> "; " ^ "<fun>" ^ (inner_loop tail)
-        | DProcV (_,_) -> "; " ^ "<dfun>" ^ (inner_loop tail)
+        | ProcV (_, _, _) -> "; " ^ "<fun>" ^ (inner_loop tail)
+        | DProcV (_, _) -> "; " ^ "<dfun>" ^ (inner_loop tail)
         | ListV l -> "; " ^ (string_of_list l) ^ (inner_loop tail))
   in
     let str = inner_loop l in
@@ -46,6 +47,31 @@ let rec string_of_exval = function
   | ListV l -> string_of_list l
 let pp_val v = print_string (string_of_exval v)
 
+let rec pattern_match value (PatternExp pattern) =
+  match pattern with
+    ILit i1 ->
+     (match value with
+        IntV i2 when (i1 = i2) -> []
+      | _ -> raise MatchError)
+  | BLit b1 ->
+     (match value with
+        BoolV b2 when (b1 = b2) -> []
+      | _ -> raise MatchError)
+  | Var x -> [(x, value)]
+  | ListExp Emp ->
+     (match value with
+        ListV EmpV -> []
+      | _ -> raise MatchError)
+  | ListExp (Cons (pt, Emp)) ->
+     (match value with
+        ListV (ConsV (v, EmpV)) -> pattern_match v pt
+      | _ -> raise MatchError)
+  | ListExp (Cons (pt1, Cons (pt2, Emp))) ->
+     (match value with
+        ListV (ConsV (v, l)) -> List.append (pattern_match v pt1) (pattern_match (ListV l) pt2)
+      | _ -> raise MatchError)
+  | Underscore -> []
+
 let rec apply_prim op arg1 arg2 = match op, arg1, arg2 with
     Plus, IntV i1, IntV i2 -> IntV (i1 + i2)
   | Plus, _, _ -> err ("Both arguments must be integer: +")
@@ -61,8 +87,7 @@ let rec apply_prim op arg1 arg2 = match op, arg1, arg2 with
   | Cons, _, ListV l -> ListV (ConsV (arg1, l))
   | Cons, _, _ -> err ("The right operand must be list: ::")
 
-(*let apply_list_prim op arg1 arg2 = match op, arg2 with
-    Cons, ListV l -> ListV (ConsV (arg1, l*)
+
 
 let rec apply_logic_prim op arg1 exp2 env = match op, arg1 with
     And, BoolV b1 ->
@@ -156,104 +181,35 @@ and eval_exp env = function
         ListV (eval_list lexp)
   | MatchExp (exp, pattern_and_body_list) ->
       let value = eval_exp env exp in
-     (match value with
-        IntV i1 ->
-          let rec search_int_pattern_and_eval = function
-              [] -> err ("Not matched")
-            | (PatternExp pattern, body) :: rest ->
-               (match pattern with
-                  ILit i2 -> 
-                    if i1 = i2 then 
-                     (try 
-                        eval_exp env body 
-                      with MatchError -> search_int_pattern_and_eval rest)
-                    else search_int_pattern_and_eval rest
-                | Var x ->
-                    let newenv = Environment.extend x value env in
-                   (try
-                      eval_exp newenv body
-                    with MatchError -> search_int_pattern_and_eval rest)
-                | Underscore -> eval_exp env body
-                | _ -> search_int_pattern_and_eval rest)
-          in
-            search_int_pattern_and_eval pattern_and_body_list
-      | BoolV b1 ->
-          let rec search_bool_pattern_and_eval = function
-              [] -> err ("Not matched")
-            | (PatternExp pattern, body) :: rest ->
-               (match pattern with
-                  BLit b2 -> 
-                    if b1 = b2 then
-                     (try
-                        eval_exp env body 
-                      with MatchError -> search_bool_pattern_and_eval rest)
-                    else search_bool_pattern_and_eval rest
-                | Var x ->
-                    let newenv = Environment.extend x value env in
-                   (try
-                      eval_exp newenv body
-                    with MatchError -> search_bool_pattern_and_eval rest)
-                | Underscore -> eval_exp env body
-                | _ -> search_bool_pattern_and_eval rest)
-          in
-            search_bool_pattern_and_eval pattern_and_body_list
+      let rec eval_matchexp = function
+          [] -> err ("Not matched")
+        | (pattern, body) :: rest ->
+            let rec check_duplication checked_l id_l =
+              match checked_l with
+                [] -> false
+              | (id, _) :: rest ->
+                  if List.exists (fun x -> x = id) id_l then true
+                  else
+                    check_duplication rest (id :: id_l)
+            and bind env = function
+                [] -> env
+              | (id, value) :: rest -> 
+                  let newenv = Environment.extend id value env in
+                  bind newenv rest
+            in
+              try
+                let id_and_value_list = pattern_match value pattern in
+                if check_duplication id_and_value_list [] then
+                  err ("one variable is bound several times in this expression")
+                else
+                  let newenv = bind env id_and_value_list in
+                  eval_exp newenv body
+              with
+                MatchError -> eval_matchexp rest
+      in
+        eval_matchexp pattern_and_body_list
 
-      | ProcV (_,_,_) 
-      | DProcV (_,_)  ->
-          let rec search_function_pattern_and_eval = function
-              [] -> err ("Not matched")
-            | (PatternExp pattern, body) :: rest ->
-               (match pattern with
-                  Var x ->
-                    let newenv = Environment.extend x value env in
-                   (try
-                      eval_exp newenv body
-                    with MatchError -> search_function_pattern_and_eval rest)
-                | Underscore -> eval_exp env body
-                | _ -> search_function_pattern_and_eval rest)
-          in
-            search_function_pattern_and_eval pattern_and_body_list
-      | ListV l ->
-          let rec search_list_pattern_and_eval = function
-              [] -> err ("Not matched")
-            | (PatternExp pattern, body) :: rest ->
-               (match pattern with
-                  Var x ->
-                    let newenv = Environment.extend x value env in
-                   (try
-                      eval_exp newenv body
-                    with MatchError -> search_list_pattern_and_eval rest)
-                | ListExp Emp ->
-                   (match l with
-                      EmpV -> 
-                       (try
-                          eval_exp env body
-                        with MatchError -> search_list_pattern_and_eval rest)
-                    | _ -> search_list_pattern_and_eval rest)
-                | ListExp (Cons (Var x, Emp)) ->
-                   (match l with
-                      ConsV (v, EmpV) -> 
-                        let newenv = Environment.extend x v env in
-                        try
-                          eval_exp newenv body
-                        with MatchError -> search_list_pattern_and_eval rest
-                    | _ -> search_list_pattern_and_eval rest)
-                | ListExp (Cons (Var x1, Cons (Var x2, Emp))) ->
-                    if x1 = x2 then err ("one variable is bound several times in this expression")
-                    else
-                     (match l with
-                        ConsV (v1, v2) ->
-                          let newenv = Environment.extend x1 v1 env in
-                          let newerenv = Environment.extend x2 (ListV v2) newenv in
-                          try
-                            eval_exp newerenv body
-                          with MatchError -> search_list_pattern_and_eval rest
-                      | _ -> search_list_pattern_and_eval rest)
-                | Underscore -> eval_exp env body
-                | _ -> search_list_pattern_and_eval rest)
-          in
-            search_list_pattern_and_eval pattern_and_body_list)
-  | MatchOneExp (exp, one_element_list) ->
+  (*| MatchOneExp (exp, one_element_list) ->
       let value = eval_exp env exp in
       match value with
         IntV i1 ->
@@ -311,7 +267,7 @@ and eval_exp env = function
                   eval_exp newerenv body
               | _ -> raise MatchError)
           | Underscore -> eval_exp env body
-          | _ -> raise MatchError)
+          | _ -> raise MatchError)*)
 
                            
 

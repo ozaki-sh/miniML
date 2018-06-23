@@ -1,6 +1,5 @@
-let l = [1;2;3];;
-
-let rec add l =
+let rec f l =
   match l with
-    [] -> 0
-  | h :: t -> h + (add t);;
+    [] -> []
+  | [x] -> x
+  | true :: r -> f r;;

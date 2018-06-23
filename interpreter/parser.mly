@@ -179,7 +179,7 @@ MatchExpr :
                   [pattern] -> [(pattern, body)]
                 | pattern_head :: pattern_rest ->
                     let exp_head :: exp_rest = exps in
-                    (pattern_head, MatchOneExp (exp_head, main_loop exp_rest [(pattern_rest, body)]))
+                    (pattern_head, MatchExp (exp_head, main_loop exp_rest [(pattern_rest, body)]))
                     ::
                     main_loop exps rest)
           in
@@ -194,14 +194,14 @@ MoreExpr :
     COMMA e=Expr { e }
 
 Pattern :
-    i=INTV                { PatternExp (ILit i) }
-  | TRUE                  { PatternExp (BLit true) }
-  | FALSE                 { PatternExp (BLit false) }
-  | x=ID                  { PatternExp (Var x) }
-  | LSTLPRN LSTRPRN       { PatternExp (ListExp Emp) }
-  | LSTLPRN x=ID LSTRPRN  { PatternExp (ListExp (Cons (Var x, Emp))) }
-  | x1=ID CONS x2=ID      { PatternExp (ListExp (Cons (Var x1, Cons (Var x2, Emp)))) }
-  | UNDERSCORE            { PatternExp (Underscore) }
+    i=INTV                      { PatternExp (ILit i) }
+  | TRUE                        { PatternExp (BLit true) }
+  | FALSE                       { PatternExp (BLit false) }
+  | x=ID                        { PatternExp (Var x) }
+  | LSTLPRN LSTRPRN             { PatternExp (ListExp Emp) }
+  | LSTLPRN p=Pattern LSTRPRN   { PatternExp (ListExp (Cons (p, Emp))) }
+  | p1=Pattern CONS p2=Pattern  { PatternExp (ListExp (Cons (p1, Cons (p2, Emp)))) }
+  | UNDERSCORE                  { PatternExp (Underscore) }
 
 PatternMatchExpr :
     pt=Patterns RARROW e1=Expr e2=list(MorePatternMatchExpr) { (pt, e1) :: e2 }

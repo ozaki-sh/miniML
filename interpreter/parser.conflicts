@@ -70,3 +70,33 @@ Patterns RARROW Expr list(MorePatternMatchExpr) // lookahead token appears becau
                 MATCH Expr list(MoreExpr) WITH PatternMatchExpr // lookahead token is inherited
                                                Patterns RARROW Expr list(MorePatternMatchExpr) // lookahead token is inherited
                                                                     . 
+
+** Conflict (shift/reduce) in state 134.
+** Token involved: CONS
+** This state is reached from toplevel after reading:
+
+MATCH Expr list(MoreExpr) WITH Pattern CONS Pattern 
+
+** The derivations that appear below have the following common factor:
+** (The question mark symbol (?) represents the spot where the derivations begin to differ.)
+
+toplevel 
+Expr SEMISEMI 
+MatchExpr 
+MATCH Expr list(MoreExpr) WITH PatternMatchExpr 
+                               Patterns RARROW Expr list(MorePatternMatchExpr) 
+                               Pattern list(MorePattern) 
+                               (?)
+
+** In state 134, looking ahead at CONS, shifting is permitted
+** because of the following sub-derivation:
+
+Pattern CONS Pattern 
+             Pattern . CONS Pattern 
+
+** In state 134, looking ahead at CONS, reducing production
+** Pattern -> Pattern CONS Pattern 
+** is permitted because of the following sub-derivation:
+
+Pattern CONS Pattern // lookahead token appears
+Pattern CONS Pattern . 

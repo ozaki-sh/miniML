@@ -31,7 +31,7 @@ type exp =
   | LetRecExp of (id * id * exp) list * exp
   | ListExp of listExp
   | MatchExp of exp * (exp * exp) list
-  | MatchOneExp of exp * (exp * exp) list
+ (* | MatchOneExp of exp * (exp * exp) list*)
   | PatternExp of exp
   | Underscore
 and listExp = Emp | Cons of exp * listExp
