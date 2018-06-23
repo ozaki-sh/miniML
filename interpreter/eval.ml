@@ -56,7 +56,7 @@ let rec pattern_match (PatternExp pattern) value =
   | ListExp (Cons (pt, Emp)), ListV (ConsV (v, EmpV))
       -> pattern_match pt v
   | ListExp (Cons (pt1, Cons (pt2, Emp))), ListV (ConsV (v, l))
-      -> List.append (pattern_match pt1 v) (pattern_match pt2 (ListV l))
+      -> (pattern_match pt1 v) @ (pattern_match pt2 (ListV l))
   | Wildcard, _ -> []
   | _, _ -> raise MatchError
 
@@ -165,97 +165,46 @@ and eval_exp env = function
             ConsV (value, eval_list rest)
       in
         ListV (eval_list lexp)
-  | MatchExp (exp, pattern_and_body_list) ->
-      let value = eval_exp env exp in
-      let rec eval_matchexp = function
-          [] -> err ("Not matched")
-        | (pattern, body) :: rest ->
-            let rec check_duplication checked_l id_l =
-              match checked_l with
-                [] -> false
-              | (id, _) :: rest ->
-                  if List.exists (fun x -> x = id) id_l then true
-                  else
-                    check_duplication rest (id :: id_l)
-            and bind env = function
-                [] -> env
-              | (id, value) :: rest -> 
-                  let newenv = Environment.extend id value env in
-                  bind newenv rest
-            in
+  | MatchExp (exps, pattern_and_body_list) ->
+      let rec eval_exps = function
+          [] -> []
+        | head :: rest -> (eval_exp env head) :: eval_exps rest
+      in
+        let values = eval_exps exps in
+        let rec outer_loop = function
+            [] -> err ("Not matched")
+          | (patterns, body) :: rest ->
               try
-                let id_and_value_list = pattern_match pattern value in
-                if check_duplication id_and_value_list [] then
+                let id_and_value_list = inner_loop patterns values in
+                if check_whether_duplication id_and_value_list [] then
                   err ("one variable is bound several times in this expression")
                 else
-                  let newenv = bind env id_and_value_list in
+                  let newenv = bind_and_return_env env id_and_value_list in
                   eval_exp newenv body
               with
-                MatchError -> eval_matchexp rest
-      in
-        eval_matchexp pattern_and_body_list
-
-  (*| MatchOneExp (exp, one_element_list) ->
-      let value = eval_exp env exp in
-      match value with
-        IntV i1 ->
-          let [(PatternExp pattern, body)] = one_element_list in
-         (match pattern with
-            ILit i2 -> 
-              if i1 = i2 then eval_exp env body 
-              else raise MatchError
-          | Var x ->
-              let newenv = Environment.extend x value env in
-              eval_exp newenv body
-          | Underscore -> eval_exp env body
-          | _ -> raise MatchError)
-      | BoolV b1 ->
-          let [(PatternExp pattern, body)] = one_element_list in
-         (match pattern with
-            BLit b2 -> 
-              if b1 = b2 then eval_exp env body 
-              else raise MatchError
-          | Var x ->
-              let newenv = Environment.extend x value env in
-               eval_exp newenv body
-          | Underscore -> eval_exp env body
-          | _ -> raise MatchError)
-      | ProcV (_,_,_) 
-      | DProcV (_,_)  ->
-          let [(PatternExp pattern, body)] = one_element_list in
-         (match pattern with
-          | Var x ->
-              let newenv = Environment.extend x value env in
-               eval_exp newenv body
-          | Underscore -> eval_exp env body
-          | _ -> raise MatchError)
-      | ListV l ->
-          let [(PatternExp pattern, body)] = one_element_list in
-         (match pattern with
-            Var x ->
-              let newenv = Environment.extend x value env in
-              eval_exp newenv body
-          | ListExp Emp ->
-             (match l with
-                EmpV -> eval_exp env body
-              | _ -> raise MatchError)
-          | ListExp (Cons (Var x, Emp)) ->
-             (match l with
-                ConsV (v, EmpV) -> 
-                  let newenv = Environment.extend x v env in
-                  eval_exp newenv body
-              | _ -> raise MatchError)
-          | ListExp (Cons (Var x1, Cons (Var x2, Emp))) ->
-             (match l with
-                ConsV (v1, v2) ->
-                  let newenv = Environment.extend x1 v1 env in
-                  let newerenv = Environment.extend x2 (ListV v2) newenv in
-                  eval_exp newerenv body
-              | _ -> raise MatchError)
-          | Underscore -> eval_exp env body
-          | _ -> raise MatchError)*)
-
-                           
+                MatchError -> outer_loop rest
+        and inner_loop pt_l val_l =
+          match pt_l, val_l with
+            [], [] -> []
+          | (pattern :: pattern_rest), (value :: value_rest)
+              -> (pattern_match pattern value)
+                 @
+                 (inner_loop pattern_rest value_rest)
+          | _, _ -> err ("The number of patterns must be same as the number of expression")
+        and check_whether_duplication checked_l id_l =
+          match checked_l with
+            [] -> false
+          | (id, value) :: rest ->
+              if List.exists (fun x -> x = id) id_l then true
+              else check_whether_duplication rest (id :: id_l)
+        and bind_and_return_env env = function
+            [] -> env
+          | (id, value) :: rest ->
+              let newenv = Environment.extend id value env in
+              bind_and_return_env newenv rest 
+        in
+          outer_loop pattern_and_body_list
+          
 
 let eval_decl env = function
     Exp e -> let v = eval_exp env e in [[("-", env, v)]]

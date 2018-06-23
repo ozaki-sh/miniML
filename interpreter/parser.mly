@@ -161,32 +161,8 @@ LetRecAndExpr :
   | f=ID fe=LetFunHeadExpr IN e2=Expr { match fe with FunExp (p, e1) -> ([(f, p, e1)], e2) }
 
 MatchExpr :
-    MATCH e1=Expr e2=list(MoreExpr) WITH option(BAR) e3=PatternMatchExpr {
-      let rec make_part_of_matchexp exps patterns_and_bodies =
-        if exps = [] then
-          let rec unfold_singleton = function
-            [] -> []
-          | ([singleton], body) :: rest ->
-              (singleton, body) :: unfold_singleton rest
-          in
-            unfold_singleton patterns_and_bodies
-        else
-          let rec main_loop exps = function
-              [] -> []
-            | head :: rest ->
-                let (patterns, body) = head in
-               (match patterns with
-                  [pattern] -> [(pattern, body)]
-                | pattern_head :: pattern_rest ->
-                    let exp_head :: exp_rest = exps in
-                    (pattern_head, MatchExp (exp_head, main_loop exp_rest [(pattern_rest, body)]))
-                    ::
-                    main_loop exps rest)
-          in
-            main_loop exps patterns_and_bodies
-      in
-        let matchlist = make_part_of_matchexp e2 e3 in
-        MatchExp (e1, matchlist) }
+    MATCH e1=Expr e2=list(MoreExpr) WITH option(BAR) e3=PatternMatchExpr { 
+      MatchExp (e1 :: e2, e3) }
 
   
 
@@ -204,16 +180,31 @@ Pattern :
   | UNDERSCORE                    { PatternExp (Wildcard) }
 
 PatternMatchExpr :
-    pt=Patterns RARROW e1=Expr e2=list(MorePatternMatchExpr) { (pt, e1) :: e2 }
+    pt=Patterns pts=list(MorePatterns) RARROW e1=Expr e2=list(MorePatternMatchExpr) { 
+      let pattern_and_body_list = List.concat e2 in
+      let rec link_pattern_with_body_andthen_cons = function
+          [] -> (pt, e1) :: pattern_and_body_list
+        | head :: rest -> (head, e1) :: link_pattern_with_body_andthen_cons rest
+      in
+        link_pattern_with_body_andthen_cons pts }
+
 
 MorePatternMatchExpr :
-    BAR pt=Patterns RARROW e=Expr { (pt, e) }
+    BAR pt=Patterns pts=list(MorePatterns) RARROW e=Expr { 
+      let rec link_pattern_with_body = function
+          [] -> [(pt, e)]
+        | head :: rest -> (head, e) :: link_pattern_with_body rest
+      in
+        link_pattern_with_body pts }
 
 Patterns :
     pt=Pattern pts=list(MorePattern) { pt :: pts }
 
 MorePattern :
     COMMA pt=Pattern { pt }
+
+MorePatterns :
+    BAR pt=Patterns { pt }
 
 
 

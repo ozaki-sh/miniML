@@ -1,9 +1,9 @@
 
-** Conflict (shift/reduce) in state 151.
+** Conflict (shift/reduce) in state 157.
 ** Token involved: BAR
 ** This state is reached from toplevel after reading:
 
-MATCH Expr list(MoreExpr) WITH option(BAR) Patterns RARROW MATCH Expr list(MoreExpr) WITH option(BAR) Patterns RARROW Expr MorePatternMatchExpr 
+MATCH Expr list(MoreExpr) WITH option(BAR) Patterns list(MorePatterns) RARROW MATCH Expr list(MoreExpr) WITH option(BAR) Patterns list(MorePatterns) RARROW Expr MorePatternMatchExpr 
 
 ** The derivations that appear below have the following common factor:
 ** (The question mark symbol (?) represents the spot where the derivations begin to differ.)
@@ -14,33 +14,33 @@ MatchExpr
 MATCH Expr list(MoreExpr) WITH option(BAR) PatternMatchExpr 
                                            (?)
 
-** In state 151, looking ahead at BAR, shifting is permitted
+** In state 157, looking ahead at BAR, shifting is permitted
 ** because of the following sub-derivation:
 
-Patterns RARROW Expr list(MorePatternMatchExpr) 
-                MatchExpr 
-                MATCH Expr list(MoreExpr) WITH option(BAR) PatternMatchExpr 
-                                                           Patterns RARROW Expr list(MorePatternMatchExpr) 
-                                                                                MorePatternMatchExpr list(MorePatternMatchExpr) 
-                                                                                                     MorePatternMatchExpr list(MorePatternMatchExpr) 
-                                                                                                     . BAR Patterns RARROW Expr 
+Patterns list(MorePatterns) RARROW Expr list(MorePatternMatchExpr) 
+                                   MatchExpr 
+                                   MATCH Expr list(MoreExpr) WITH option(BAR) PatternMatchExpr 
+                                                                              Patterns list(MorePatterns) RARROW Expr list(MorePatternMatchExpr) 
+                                                                                                                      MorePatternMatchExpr list(MorePatternMatchExpr) 
+                                                                                                                                           MorePatternMatchExpr list(MorePatternMatchExpr) 
+                                                                                                                                           . BAR Patterns list(MorePatterns) RARROW Expr 
 
-** In state 151, looking ahead at BAR, reducing production
+** In state 157, looking ahead at BAR, reducing production
 ** list(MorePatternMatchExpr) -> 
 ** is permitted because of the following sub-derivation:
 
-Patterns RARROW Expr list(MorePatternMatchExpr) // lookahead token appears because list(MorePatternMatchExpr) can begin with BAR
-                MatchExpr // lookahead token is inherited
-                MATCH Expr list(MoreExpr) WITH option(BAR) PatternMatchExpr // lookahead token is inherited
-                                                           Patterns RARROW Expr list(MorePatternMatchExpr) // lookahead token is inherited
-                                                                                MorePatternMatchExpr list(MorePatternMatchExpr) // lookahead token is inherited
-                                                                                                     . 
+Patterns list(MorePatterns) RARROW Expr list(MorePatternMatchExpr) // lookahead token appears because list(MorePatternMatchExpr) can begin with BAR
+                                   MatchExpr // lookahead token is inherited
+                                   MATCH Expr list(MoreExpr) WITH option(BAR) PatternMatchExpr // lookahead token is inherited
+                                                                              Patterns list(MorePatterns) RARROW Expr list(MorePatternMatchExpr) // lookahead token is inherited
+                                                                                                                      MorePatternMatchExpr list(MorePatternMatchExpr) // lookahead token is inherited
+                                                                                                                                           . 
 
-** Conflict (shift/reduce) in state 139.
+** Conflict (shift/reduce) in state 148.
 ** Token involved: BAR
 ** This state is reached from toplevel after reading:
 
-MATCH Expr list(MoreExpr) WITH option(BAR) Patterns RARROW MATCH Expr list(MoreExpr) WITH option(BAR) Patterns RARROW Expr 
+MATCH Expr list(MoreExpr) WITH option(BAR) Patterns list(MorePatterns) RARROW MATCH Expr list(MoreExpr) WITH option(BAR) Patterns list(MorePatterns) RARROW Expr 
 
 ** The derivations that appear below have the following common factor:
 ** (The question mark symbol (?) represents the spot where the derivations begin to differ.)
@@ -51,25 +51,25 @@ MatchExpr
 MATCH Expr list(MoreExpr) WITH option(BAR) PatternMatchExpr 
                                            (?)
 
-** In state 139, looking ahead at BAR, shifting is permitted
+** In state 148, looking ahead at BAR, shifting is permitted
 ** because of the following sub-derivation:
 
-Patterns RARROW Expr list(MorePatternMatchExpr) 
-                MatchExpr 
-                MATCH Expr list(MoreExpr) WITH option(BAR) PatternMatchExpr 
-                                                           Patterns RARROW Expr list(MorePatternMatchExpr) 
-                                                                                MorePatternMatchExpr list(MorePatternMatchExpr) 
-                                                                                . BAR Patterns RARROW Expr 
+Patterns list(MorePatterns) RARROW Expr list(MorePatternMatchExpr) 
+                                   MatchExpr 
+                                   MATCH Expr list(MoreExpr) WITH option(BAR) PatternMatchExpr 
+                                                                              Patterns list(MorePatterns) RARROW Expr list(MorePatternMatchExpr) 
+                                                                                                                      MorePatternMatchExpr list(MorePatternMatchExpr) 
+                                                                                                                      . BAR Patterns list(MorePatterns) RARROW Expr 
 
-** In state 139, looking ahead at BAR, reducing production
+** In state 148, looking ahead at BAR, reducing production
 ** list(MorePatternMatchExpr) -> 
 ** is permitted because of the following sub-derivation:
 
-Patterns RARROW Expr list(MorePatternMatchExpr) // lookahead token appears because list(MorePatternMatchExpr) can begin with BAR
-                MatchExpr // lookahead token is inherited
-                MATCH Expr list(MoreExpr) WITH option(BAR) PatternMatchExpr // lookahead token is inherited
-                                                           Patterns RARROW Expr list(MorePatternMatchExpr) // lookahead token is inherited
-                                                                                . 
+Patterns list(MorePatterns) RARROW Expr list(MorePatternMatchExpr) // lookahead token appears because list(MorePatternMatchExpr) can begin with BAR
+                                   MatchExpr // lookahead token is inherited
+                                   MATCH Expr list(MoreExpr) WITH option(BAR) PatternMatchExpr // lookahead token is inherited
+                                                                              Patterns list(MorePatterns) RARROW Expr list(MorePatternMatchExpr) // lookahead token is inherited
+                                                                                                                      . 
 
 ** Conflict (shift/reduce) in state 136.
 ** Token involved: CONS
@@ -84,7 +84,7 @@ toplevel
 Expr SEMISEMI 
 MatchExpr 
 MATCH Expr list(MoreExpr) WITH option(BAR) PatternMatchExpr 
-                                           Patterns RARROW Expr list(MorePatternMatchExpr) 
+                                           Patterns list(MorePatterns) RARROW Expr list(MorePatternMatchExpr) 
                                            Pattern list(MorePattern) 
                                            (?)
 
