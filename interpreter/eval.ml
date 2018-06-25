@@ -16,7 +16,6 @@ and dnval = exval
 
 
 exception Error of string
-exception InnerMatchError
 exception MatchError
 
 let err s = raise (Error s)

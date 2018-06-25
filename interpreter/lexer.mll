@@ -13,7 +13,6 @@ let reservedWords = [
   ("rec", Parser.REC);
   ("then", Parser.THEN);
   ("true", Parser.TRUE);
-  ("when", Parser.WHEN);
   ("with", Parser.WITH);
 ] 
 }
@@ -58,9 +57,9 @@ rule main = parse
 and comment i = parse
   "(*" { comment (i+1) lexbuf }
 | "*)" 
-  { if i = 0 then main lexbuf
-    else comment (i-1) lexbuf 
-  }
+    { if i = 0 then main lexbuf
+      else comment (i-1) lexbuf 
+    }
 | _ { comment i lexbuf }
 
 

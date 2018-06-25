@@ -4,7 +4,6 @@ open Eval
 let rec read_eval_print env =
   print_string "# ";
   flush stdout;
-  (* display error massage and evaluate next expression *)
   let print_error_and_go s = 
     print_string s;
     print_newline();
@@ -13,7 +12,6 @@ let rec read_eval_print env =
     try
       let decl = Parser.toplevel Lexer.main (Lexing.from_channel stdin) in
       let decls = eval_decl env decl in
-      let result_list = [] in
       let rec list_process l env r_list=        
         match l with
           [] -> (env, r_list)
@@ -21,15 +19,15 @@ let rec read_eval_print env =
             let rec list_list_process l env r_list=
               match l with
                 [] -> list_process outer_rest env r_list
-              | (id, newenv, v) as set:: inner_rest -> list_list_process inner_rest newenv (set :: r_list)
+              | (id, newenv, v) as set :: inner_rest -> list_list_process inner_rest newenv (set :: r_list)
             in 
               list_list_process head env r_list
       in
-        let (newenv, returned_result_list) = list_process decls env result_list in
+        let (newenv, returned_result_list) = list_process decls env [] in
         let rec remove_duplication l id_l=
           match l with
             [] -> []
-          | (id, newenv, v) as head :: tail ->
+          | (id, _, v) as head :: tail ->
               if List.exists (fun x -> x = id) id_l then
                 remove_duplication tail id_l
               else
@@ -39,7 +37,7 @@ let rec read_eval_print env =
           let rec display l = 
             match l with
               [] -> read_eval_print newenv
-            | (id, newenv, v) :: rest ->
+            | (id, _, v) :: rest ->
                 Printf.printf "val %s = " id;
                 pp_val v;
                 print_newline();
@@ -122,8 +120,8 @@ let initial_env =
        (Environment.extend "x" (IntV 10) Environment.empty))
 
 let _ = 
-  try (* if filename is given then do *)
+  try 
     let filename = Sys.argv.(1) in
     read_eval_print_from_file initial_env filename
-  with (* else do this *)
+  with
     Invalid_argument _ -> read_eval_print initial_env

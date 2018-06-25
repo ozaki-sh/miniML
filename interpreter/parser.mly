@@ -11,7 +11,6 @@ open Syntax
 %token REC
 %token MATCH WITH BAR
 %token LSTLPRN LSTRPRN CONS SEMI
-%token WHEN
 %token COMMA UNDERSCORE
 
 %token <int> INTV
@@ -129,8 +128,6 @@ ListHeadExpr :
 ListTailExpr :
     SEMI e=Expr lst=ListTailExpr { Cons (e, lst) }
   | LSTRPRN { Emp }
-
-
 
 IfExpr :
     IF c=Expr THEN t=Expr ELSE e=Expr { IfExp (c, t, e) } 

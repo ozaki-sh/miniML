@@ -12,7 +12,6 @@ type exp =
   | BinOp of binOp * exp * exp
   (* BinOp(Plus, ILit 4, Var "x") --> 4 + x *)
   | BinLogicOp of binLogicOp * exp * exp
-  | BinListOp of binListOp * exp * exp
   | IfExp of exp * exp * exp
   (* IfExp(BinOp(Lt, Var "x", ILit 4), 
            ILit 3, 
