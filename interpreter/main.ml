@@ -4,6 +4,7 @@ open Eval
 let rec read_eval_print env =
   print_string "# ";
   flush stdout;
+  (* display error massage and evaluate next expression *)
   let print_error_and_go s = 
     print_string s;
     print_newline();
@@ -52,7 +53,7 @@ let rec read_eval_print env =
     | Parser.Error -> print_error_and_go "Syntax Error! at parser"
     | Failure s -> print_error_and_go ("Syntax Error! at " ^ s)
     | Sys_error s -> print_error_and_go ("File Error! " ^ s)
-    (*| _ -> print_error_and_go "Syntax Error! at unknown"*)
+    | _ -> print_error_and_go "Syntax Error! cause is unknown"
 
 
 let read_eval_print_from_file env filename =
@@ -121,9 +122,8 @@ let initial_env =
        (Environment.extend "x" (IntV 10) Environment.empty))
 
 let _ = 
-  try let filename = Sys.argv.(1) in
-        read_eval_print_from_file initial_env filename
-  with
+  try (* if filename is given then do *)
+    let filename = Sys.argv.(1) in
+    read_eval_print_from_file initial_env filename
+  with (* else do this *)
     Invalid_argument _ -> read_eval_print initial_env
-
-(*let _ = read_eval_print initial_env*)

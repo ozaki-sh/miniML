@@ -5,8 +5,6 @@ type binOp = Plus | Minus | Mult | Lt | Eq | Cons
 
 type binLogicOp = And | Or
 
-type binListOp = Cons
-
 type exp =
   | Var of id (* Var "x" --> x *)
   | ILit of int (* ILit 3 --> 3 *)
