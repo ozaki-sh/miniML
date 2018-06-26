@@ -181,17 +181,17 @@ MoreExpr :
     COMMA e=Expr { e }
 
 Pattern :
-    LSTLPRN pt=Pattern LSTRPRN { PatternExp (ListExp (Cons (pt, Emp))) }
-  | pt1=Pattern CONS pt2=Pattern { PatternExp (ListExp (Cons (pt1, Cons (pt2, Emp)))) }
+    LSTLPRN pt=Pattern LSTRPRN { ListExp (Cons (pt, Emp)) }
+  | pt1=Pattern CONS pt2=Pattern { ListExp (Cons (pt1, Cons (pt2, Emp))) }
   | pt=APattern { pt }
 
 APattern :
-    i=INTV { PatternExp (ILit i) }
-  | TRUE { PatternExp (BLit true) }
-  | FALSE  { PatternExp (BLit false) }
-  | x=ID { PatternExp (Var x) }
-  | LSTLPRN LSTRPRN { PatternExp (ListExp Emp) }
-  | UNDERSCORE { PatternExp (Wildcard) }
+    i=INTV { ILit i }
+  | TRUE { BLit true }
+  | FALSE  { BLit false }
+  | x=ID { Var x }
+  | LSTLPRN LSTRPRN { ListExp Emp }
+  | UNDERSCORE { Wildcard }
   | LPAREN pt=Pattern RPAREN { pt }
 
 PatternMatchExpr :

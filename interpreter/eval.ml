@@ -46,7 +46,8 @@ let rec string_of_exval = function
   | ListV l -> string_of_list l
 let pp_val v = print_string (string_of_exval v)
 
-let rec pattern_match (PatternExp pattern) value =
+
+let rec pattern_match pattern value =
   match pattern, value with
     ILit i1, IntV i2 when (i1 = i2) -> []
   | BLit b1, BoolV b2 when (b1 = b2) -> []
@@ -58,7 +59,6 @@ let rec pattern_match (PatternExp pattern) value =
       -> (pattern_match pt1 v) @ (pattern_match pt2 (ListV l))
   | Wildcard, _ -> []
   | _, _ -> raise MatchError
-
 
 
 let rec apply_prim op arg1 arg2 = match op, arg1, arg2 with
@@ -75,7 +75,6 @@ let rec apply_prim op arg1 arg2 = match op, arg1, arg2 with
   | Eq, _, _ -> err ("Both arguments must have same type: =")
   | Cons, _, ListV l -> ListV (ConsV (arg1, l))
   | Cons, _, _ -> err ("The right operand must be list: ::")
-
 
 
 let rec apply_logic_prim op arg1 exp2 env = match op, arg1 with
@@ -165,11 +164,13 @@ and eval_exp env = function
       in
         ListV (eval_list lexp)
   | MatchExp (exps, pattern_and_body_list) ->
+      (* マッチする対象を評価 *)
       let rec eval_exps = function
           [] -> []
         | head :: rest -> (eval_exp env head) :: eval_exps rest
       in
         let values = eval_exps exps in
+        (* (パターン列) -> (式) を順に取り出して処理 *)
         let rec outer_loop = function
             [] -> err ("Not matched")
           | (patterns, body) :: rest ->
@@ -182,6 +183,7 @@ and eval_exp env = function
                   eval_exp newenv body
               with
                 MatchError -> outer_loop rest
+        (* パターン列を順にマッチさせていく *)
         and inner_loop pt_l val_l =
           match pt_l, val_l with
             [], [] -> []
@@ -190,12 +192,14 @@ and eval_exp env = function
                  @
                  (inner_loop pattern_rest value_rest)
           | _, _ -> err ("The number of patterns must be same as the number of expression")
+        (* 同一パターン列の中に同じ変数が現れてないかをチェック *)
         and check_whether_duplication checked_l id_l =
           match checked_l with
             [] -> false
           | (id, value) :: rest ->
               if List.exists (fun x -> x = id) id_l then true
               else check_whether_duplication rest (id :: id_l)
+        (* パターンマッチの結果束縛する必要がある変数を束縛した環境を返す *)
         and bind_and_return_env env = function
             [] -> env
           | (id, value) :: rest ->
