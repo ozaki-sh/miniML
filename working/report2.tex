@@ -1,6 +1,7 @@
 \documentclass{jarticle}
 \usepackage[dvipdfmx]{graphicx}
 \usepackage{here}
+\usepackage{listings}
 
 \begin{document}
 
@@ -11,7 +12,124 @@
 \maketitle
 
 \section{はじめに}
-ソースコード単位で解説していくのではなく、課題単位で解説していくのでプログラムの全体像が少し見えづらいことをはじめに断っておく。
+ソースコード単位で解説していくのではなく、課題単位で解説していく。
+また、説明はできるだけその時点における説明にしようと思うので、ソースコードとの整合性が取れない場合がある。
+例えば、ソースコードにおいてLTExprはCmpExprになっているが、説明ではLTExprが登場する。最後に、課題には存在しなかったが、
+デバッグのしやすさから減算と、比較のイコールを実装している（ただし、減算は-と第二オペランドの間に空白を入れないと
+きちんと動作しない）。
 
 \section{各課題の説明}
-\subsection{Ex3.2.1}
+\subsection{Exercise 3.2.1}
+テストプログラムとその実行は以下である。
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize, frame=single]
+# if (3 * 4) < 15 then 1 + 2 * 3 else 0;;
+val - = 7
+\end{lstlisting}
+これによりif文、加算、乗算、比較、その優先順位が正しく動作していることがわかる。
+また、問題文にあるようにiiを2、iiiを3、ivを4に束縛した環境を大域環境にすると
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize, frame=single]
+# iv + iii * ii;;
+val - = 10
+\end{lstlisting}
+となる。
+
+\subsection{Exercise 3.2.2}
+\subsubsection{設計方針}
+read-eval-printループ内でエラーを検出して、エラーの種類に応じてエラーメッセージを表示したあとに
+read-eval-printループに戻る。
+
+\subsubsection{実装の詳細}
+main.mlの7〜10行目にprint\_error\_and\_go関数を定義している。これはstringを受け取って、それを表示したあとに
+read\_eval\_print関数を呼び出す。これは、エラー処理をまとめたものである。そしてmain.mlの12行目にtryがあって、
+47行目にwithがあって、エラーをパターンマッチして、表示するメッセージをprint\_error\_and\_go関数にわたす。
+エラーの種類はevalで発生するもの、parserで発生するもの、lexerで発生するもの、正体不明の四つに分類した。
+
+\subsection{Exercise 3.2.3}
+\subsubsection{設計方針}
+単純に \& \& と \textbar \textbar を認識できるようにして、それらに対応する文法規則を追加する。評価においては、
+第一オペランドを評価した時点で値が確定するなら第二オペランドは評価しない。そのため、通常の二項演算子とは
+異なる関数が必要となる。
+
+\subsubsection{実装の詳細}
+lexer.mllの38行目は「\& \& 」をANDというトークンに、39行目は「\textbar \textbar」をORをいうトークンに変換する
+規則である。そして、優先順位を考慮して、LTExprの上にAndExpr、AndExprの上にOrExprというようになっている。評価に関しては、
+他の二項演算子と違って、オペランドを評価したりしなかったりするので、区別するためにBinLogicOpという新たな型を作った。この型のコンストラクタはAndとOrの二つである。そして、eval.mlの64〜77行目にapply\_logic\_prim関数を定義している。これは、
+BinLogicOpとexvalとexpを引数にとって、exvalを返す。opがAndでarg1がBoolV falseならexp2は評価せずにBoolV falseを返す。
+opがAndでarg1がtrueならexp2の評価結果を返す。opがOrの場合も同様である(trueとfalseは逆だが)。なお、オペランドがboolの値をもってなければエラーを吐く。また、eval\_exp関数にBinLogicOpの場合を追加して、第一オペランドを評価してからapply\_logic\_prim関数を呼び出している。最後に、apply\_logic\_prim関数とeval\_exp関数は相互再帰の形になったので、andでつないでいる。
+
+\subsection{Exercise 3.2.4}
+\subsubsection{設計方針}
+lexer.mllに新たなルールを追加して、再帰的に呼び出せるようにする。ただし、コメントのネストがきちんとできるように
+コメントの深さを管理する。
+
+\subsubsection{実装の詳細}
+lexer.mllの57行目以降にcommentというルールを追加した。このルールは整数を一つ受け取る。この整数はコメントの深さを
+表していて、この「($\ast$　」が現れるたびに1増え、「$\ast$) 」が現れるたびに1減る。ルールmainで「($\ast$ 」が現れた
+ときはルールcommentを0で呼び出す。そして、0のときに「$\ast$)」が現れたときはルールmainを呼び出す。
+
+\subsection{Exercise 3.3.1}
+教科書通りにしただけなので、設計方針等はない。
+テストプログラムは以下である。
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize, frame=single]
+# let x = 1 + 2;;
+val x = 3
+# let y = 1;;
+val y = 1
+# let y = x + 1 in y * 5;;
+val - = 20
+# y;;
+val - = 1
+\end{lstlisting}
+let宣言によってxが3に束縛されていることがわかり、let式もきちんと動作していることがわかる。
+さらに、let式で束縛したyはスコープの外では見えないことがわかる。
+
+\subsection{Exercise 3.3.2/Exercise 3.3.4}
+\subsubsection{設計方針}
+\subsubsection{実装の詳細}
+
+\subsection{Exercise 3.3.3}
+\subsubsection{設計方針}
+\subsubsection{実装の詳細}
+
+\subsection{Exercise 3.4.1}
+\subsubsection{設計方針}
+\subsubsection{実装の詳細}
+
+\subsection{Exercise 3.4.2}
+\subsubsection{設計方針}
+\subsubsection{実装の詳細}
+
+\subsection{Exercise 3.4.3}
+\subsubsection{設計方針}
+\subsubsection{実装の詳細}
+
+\subsection{Exercise 3.4.5}
+\subsubsection{設計方針}
+\subsubsection{実装の詳細}
+
+\subsection{Exercise 3.5.1}
+\subsubsection{設計方針}
+\subsubsection{実装の詳細}
+
+\subsection{Exercise 3.5.2}
+\subsubsection{設計方針}
+\subsubsection{実装の詳細}
+
+\subsection{Exercise 3.6.1/Exercise 3.6.3/Exercise 3.6.4}
+\subsubsection{設計方針}
+\subsubsection{実装の詳細}
+
+\subsection{Exercise 3.6.2}
+\subsubsection{設計方針}
+\subsubsection{実装の詳細}
+
+\subsection{Exercise 3.6.5}
+\subsubsection{設計方針}
+\subsubsection{実装の詳細}
+
+
+
+
+
+
+\end{document}
