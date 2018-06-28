@@ -32,36 +32,34 @@ LetDecl :
 LetAndDecl :
     x=ID EQ e=Expr LETAND d=LetAndDecl { (x, e) :: d }
   | x=ID EQ e=Expr { [(x, e)] }
-  | f=ID fe=LetFunHeadExpr LETAND d=LetAndDecl { match fe with 
-                                                   FunExp (p ,e) -> (f, FunExp (p, e)) :: d }
-  | f=ID fe=LetFunHeadExpr { match fe with FunExp (p, e) -> [(f, FunExp (p, e))] }
+  | f=ID fe=LetFunExpr LETAND d=LetAndDecl { match fe with FunExp (p ,e) -> (f, FunExp (p, e)) :: d }
+  | f=ID fe=LetFunExpr { match fe with FunExp (p, e) -> [(f, FunExp (p, e))] }
 
 LetRecDecl :
     LET REC d1=LetRecAndDecl d2=LetRecDecl { d1 :: d2 }
   | LET REC d=LetRecAndDecl { [d] }
 
 LetRecAndDecl :
-    f=ID EQ fe=FunHeadExpr LETAND d=LetRecAndDecl { match fe with FunExp (p, e) -> (f, p, e) :: d }
-  | f=ID EQ fe=FunHeadExpr { match fe with FunExp (p, e) -> [(f, p, e)] }
-  | f=ID fe=LetFunHeadExpr LETAND d=LetRecAndDecl { match fe with 
-                                                      FunExp (p, e) ->(f, p, e) :: d }
-  | f=ID fe=LetFunHeadExpr { match fe with FunExp (p, e) -> [(f, p, e)] }
+    f=ID EQ fe=FunExpr LETAND d=LetRecAndDecl { match fe with FunExp (p, e) -> (f, p, e) :: d }
+  | f=ID EQ fe=FunExpr { match fe with FunExp (p, e) -> [(f, p, e)] }
+  | f=ID fe=LetFunExpr LETAND d=LetRecAndDecl { match fe with FunExp (p, e) ->(f, p, e) :: d }
+  | f=ID fe=LetFunExpr { match fe with FunExp (p, e) -> [(f, p, e)] }
     
 
 Expr :
     e=IfExpr { e }
   | e=OrExpr { e }
   | e=LetExpr { e }
-  | e=FunHeadExpr { e }
-  | e=DFunHeadExpr { e }
+  | e=FunExpr { e }
+  | e=DFunExpr { e }
   | e=LetRecExpr { e }
   | e=MatchExpr { e }
 
 LookRightExpr :
     e=IfExpr { e }
   | e=LetExpr { e }
-  | e=FunHeadExpr { e }
-  | e=DFunHeadExpr { e }
+  | e=FunExpr { e }
+  | e=DFunExpr { e }
   | e=LetRecExpr { e }
   | e=MatchExpr { e }
 
@@ -138,44 +136,46 @@ LetExpr :
 LetAndExpr :
     x=ID EQ e1=Expr LETAND le=LetAndExpr { let (l, e2) = le in ((x, e1) :: l, e2) } 
   | x=ID EQ e1=Expr IN e2=Expr { ([(x, e1)], e2) }
-  | f=ID e1=LetFunHeadExpr LETAND le=LetAndExpr { let (l, e2) = le in ((f, e1) :: l, e2) } 
-  | f=ID e1=LetFunHeadExpr IN e2=Expr { ([(f, e1)], e2) }
+  | f=ID e1=LetFunExpr LETAND le=LetAndExpr { let (l, e2) = le in ((f, e1) :: l, e2) } 
+  | f=ID e1=LetFunExpr IN e2=Expr { ([(f, e1)], e2) }
 
-LetFunHeadExpr :
-    x=ID e=LetFunTailExpr { FunExp(x, e) }
+LetFunExpr :
+    p=nonempty_list(ID) EQ e=Expr {
+      let rec loop = function
+          [para] -> FunExp (para, e)
+        | head :: rest -> FunExp (head, loop rest)
+      in
+        loop p }
 
-LetFunTailExpr :
-    x=ID e=LetFunTailExpr { FunExp(x, e) }
-  | EQ e=Expr { e }
+FunExpr :
+    FUN p=nonempty_list(ID) RARROW e=Expr {
+      let rec loop = function
+          [para] -> FunExp (para, e)
+        | head :: rest -> FunExp (head, loop rest)
+      in
+        loop p }
 
-FunHeadExpr :
-    FUN p=ID e=FunTailExpr { FunExp (p, e) }
-
-FunTailExpr :
-    p=ID e=FunTailExpr { FunExp (p, e) }
-  | RARROW e=Expr { e }
-
-DFunHeadExpr :
-    DFUN p=ID e=DFunTailExpr { DFunExp (p, e) }
-
-DFunTailExpr :
-    p=ID e=DFunTailExpr { DFunExp (p, e) }
-  | RARROW e=Expr { e }
+DFunExpr :
+    DFUN p=nonempty_list(ID) RARROW e=Expr {
+      let rec loop = function
+          [para] -> DFunExp (para, e)
+        | head :: rest -> DFunExp (head, loop rest)
+      in
+        loop p }
 
 LetRecExpr :
     LET REC le=LetRecAndExpr { let (l, e) = le in LetRecExp (l, e) }
 
 LetRecAndExpr :
-    f=ID EQ fe=FunHeadExpr LETAND le=LetRecAndExpr { match fe with FunExp (p, e1) ->
+    f=ID EQ fe=FunExpr LETAND le=LetRecAndExpr { match fe with FunExp (p, e1) ->
                                                        let (l, e2) = le in ((f, p, e1) :: l, e2) } 
-  | f=ID EQ fe=FunHeadExpr IN e2=Expr { match fe with FunExp (p, e1) -> ([(f, p, e1)], e2) }
-  | f=ID fe=LetFunHeadExpr LETAND le=LetRecAndExpr { match fe with FunExp (p, e1) ->
+  | f=ID EQ fe=FunExpr IN e2=Expr { match fe with FunExp (p, e1) -> ([(f, p, e1)], e2) }
+  | f=ID fe=LetFunExpr LETAND le=LetRecAndExpr { match fe with FunExp (p, e1) ->
                                                        let (l, e2) = le in ((f, p, e1) :: l, e2) } 
-  | f=ID fe=LetFunHeadExpr IN e2=Expr { match fe with FunExp (p, e1) -> ([(f, p, e1)], e2) }
+  | f=ID fe=LetFunExpr IN e2=Expr { match fe with FunExp (p, e1) -> ([(f, p, e1)], e2) }
 
 MatchExpr :
-    MATCH e1=Expr e2=list(MoreExpr) WITH option(BAR) e3=PatternMatchExpr { 
-      MatchExp (e1 :: e2, e3) }
+    MATCH e1=Expr e2=list(MoreExpr) WITH option(BAR) e3=PatternMatchExpr { MatchExp (e1 :: e2, e3) }
  
 MoreExpr :
     COMMA e=Expr { e }

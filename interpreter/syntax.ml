@@ -40,7 +40,36 @@ type exp =
   | Wildcard (* Wildcard --> _ *)
 and listExp = Emp | Cons of exp * listExp
 
+type tyvar = int
+
+type ty =
+    TyInt
+  | TyBool
+  | TyVar of tyvar
+  | TyFun of ty * ty
+
 type program = 
     Exp of exp
   | Decls of ((id * exp) list) list
   | RecDecls of ((id * id * exp) list) list
+
+let rec string_of_ty = function
+    TyInt -> "int"
+  | TyBool -> "bool"
+  | TyVar tyvar -> string_of_int tyvar
+  | TyFun (para, body) -> "(" ^ (string_of_ty para) ^ " -> " ^ (string_of_ty body) ^ ")"
+
+let pp_ty ty =
+  match ty with
+    TyFun _ -> 
+      let str_tyfun = string_of_ty ty in 
+      print_string (String.sub str_tyfun 1 (String.length str_tyfun))
+  | _ -> print_string (string_of_ty ty)
+        
+
+let rec freevar_ty ty = 
+  match ty with
+    TyInt
+  | TyBool -> MySet.empty
+  | TyVar tyvar -> MySet.singleton tyvar
+  | TyFun (para, body) -> MySet.union (freevar_ty para) (freevar_ty body)

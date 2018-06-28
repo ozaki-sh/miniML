@@ -170,7 +170,7 @@ and eval_exp env = function
         | head :: rest -> (eval_exp env head) :: eval_exps rest
       in
         let values = eval_exps exps in
-        (* (パターン列) -> (式) を順に取り出して処理 *)
+        (* (パターン列) -> (本体式) を順に取り出して処理 *)
         let rec outer_loop = function
             [] -> err ("Not matched")
           | (patterns, body) :: rest ->
