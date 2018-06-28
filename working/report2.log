@@ -1,4 +1,4 @@
-This is e-pTeX, Version 3.14159265-p3.6-141210-2.6 (utf8.euc) (TeX Live 2015/Debian) (preloaded format=platex 2018.1.10)  27 JUN 2018 11:34
+This is e-pTeX, Version 3.14159265-p3.6-141210-2.6 (utf8.euc) (TeX Live 2015/Debian) (preloaded format=platex 2018.1.10)  28 JUN 2018 16:44
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -146,15 +146,27 @@ LaTeX Font Info:    External font `cmex10' loaded for size
 (Font)              <7> on input line 67.
 LaTeX Font Info:    External font `cmex10' loaded for size
 (Font)              <5> on input line 67.
- [3]
-(./report2.aux) ) 
+ [3] [4]
+Overfull \hbox (12.38628pt too wide) in paragraph at lines 148--151
+[]\JY1/mc/m/n/10 複数引数の関数は 、 カリ ー化の考えで 、 \OT1/cmr/m/n/10 1 \JY
+1/mc/m/n/10 引数関数に帰着できるので 、 \OT1/cmr/m/n/10 parser.mly
+ []
+
+[5]
+Overfull \hbox (17.69124pt too wide) in paragraph at lines 152--156
+[]\JY1/mc/m/n/10 上の方は \OT1/cmr/m/n/10 parser.mly \JY1/mc/m/n/10 の \OT1/cmr
+/m/n/10 150\JY1/mc/m/n/10 ～\OT1/cmr/m/n/10 156 \JY1/mc/m/n/10 行目の部分である
+ 。 パラメ ータを \OT1/cmr/m/n/10 nonempty[]list
+ []
+
+[6] [7] [8] [9] [10] (./report2.aux) ) 
 Here is how much of TeX's memory you used:
  2090 strings out of 494865
  29048 string characters out of 6179769
- 90213 words of memory out of 5000000
+ 97213 words of memory out of 5000000
  5533 multiletter control sequences out of 15000+600000
  14228 words of font info for 56 fonts, out of 8000000 for 9000
  264 hyphenation exceptions out of 8191
- 27i,6n,32p,390b,956s stack positions out of 5000i,500n,10000p,200000b,80000s
+ 27i,6n,32p,390b,1577s stack positions out of 5000i,500n,10000p,200000b,80000s
 
-Output written on report2.dvi (3 pages, 8516 bytes).
+Output written on report2.dvi (10 pages, 38440 bytes).
