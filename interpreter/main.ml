@@ -53,7 +53,8 @@ let rec read_eval_print env tyenv=
       Eval.Error s -> print_error_and_go ("Error! " ^ s)
     | Parser.Error -> print_error_and_go "Syntax Error! at parser"
     | Failure s -> print_error_and_go ("Syntax Error! at " ^ s)
-    | _ -> print_error_and_go "Syntax Error! cause is unknown"
+    | Typing.Error s -> print_error_and_go ("Error! " ^ s)
+   (* | _ -> print_error_and_go "Syntax Error! cause is unknown"*)
 
 
 let read_eval_print_from_file env tyenv filename =
@@ -132,7 +133,6 @@ let read_eval_print_from_file env tyenv filename =
               | Parser.Error -> print_error_and_go "Syntax Error! at parser"
               | Failure s -> print_error_and_go ("Syntax Error! at " ^ s)
               | Sys_error s -> print_error_and_go ("File Error! " ^ s)
-              | Typing.Error s -> print_error_and_go ("Error! " ^ s)
               | _ -> print_error_and_go "Syntax Error! cause is unknown"
        in
          inner_loop env tyenv (List.rev (get_str_list_by_semisemi 0 1 0 []))

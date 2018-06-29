@@ -40,6 +40,12 @@ type exp =
   | Wildcard (* Wildcard --> _ *)
 and listExp = Emp | Cons of exp * listExp
 
+
+type program = 
+    Exp of exp
+  | Decls of ((id * exp) list) list
+  | RecDecls of ((id * id * exp) list) list
+
 type tyvar = int
 
 type ty =
@@ -48,28 +54,40 @@ type ty =
   | TyVar of tyvar
   | TyFun of ty * ty
 
-type program = 
-    Exp of exp
-  | Decls of ((id * exp) list) list
-  | RecDecls of ((id * id * exp) list) list
+let alphabet_of_0to25 i = 
+  if i >= 0 && i <= 25 then Char.escaped (char_of_int (i + 97))
+  else "error"
+
+let string_of_tyvar tyvar =
+  let mod26 = tyvar mod 26 in
+  let quo26 = tyvar / 26 in
+  let alphabet = alphabet_of_0to25 mod26 in
+  let suffix = if quo26 = 0 then "" else string_of_int quo26 in
+  "'" ^ alphabet ^ suffix
 
 let rec string_of_ty = function
     TyInt -> "int"
   | TyBool -> "bool"
-  | TyVar tyvar -> string_of_int tyvar
-  | TyFun (para, body) -> "(" ^ (string_of_ty para) ^ " -> " ^ (string_of_ty body) ^ ")"
+  | TyVar tyvar -> string_of_tyvar tyvar
+  | TyFun (TyFun (_, _) as domty, ranty) -> "(" ^ (string_of_ty domty) ^ ")" ^
+                                            " -> " ^ (string_of_ty ranty)
+  | TyFun (domty, ranty) -> (string_of_ty domty) ^ " -> " ^ (string_of_ty ranty)
+  
 
-let pp_ty ty =
-  match ty with
-    TyFun _ -> 
-      let str_tyfun = string_of_ty ty in 
-      print_string (String.sub str_tyfun 1 (String.length str_tyfun))
-  | _ -> print_string (string_of_ty ty)
-        
+(* pretty printing *)
+let pp_ty ty = print_string (string_of_ty ty)
+
+
+let fresh_tyvar =
+  let counter = ref 0 in
+  let body () =
+    let v = !counter in
+      counter := v + 1; v
+  in body        
 
 let rec freevar_ty ty = 
   match ty with
     TyInt
   | TyBool -> MySet.empty
   | TyVar tyvar -> MySet.singleton tyvar
-  | TyFun (para, body) -> MySet.union (freevar_ty para) (freevar_ty body)
+  | TyFun (domty, ranty) -> MySet.union (freevar_ty domty) (freevar_ty ranty)
