@@ -126,15 +126,15 @@ let rec ty_exp tyenv = function
       let rec ty_letrec_list l tyenv para_ty_exp_l id_l =
         match l with
           [] -> 
-            let rec make_subst = function
+            let rec make_eqs_list = function
                 [] -> []
-              | (para, ty, exp) :: rest ->
-                  let (s, _) = ty_exp (Environment.extend para ty !tyenv) exp in
-                  s :: make_subst rest 
+              | (para, domty, ranty, exp) :: rest ->
+                  let (s, t) = ty_exp (Environment.extend para domty !tyenv) exp in
+                  (eqs_of_subst s) :: [(t, ranty)] :: make_eqs_list rest
             in
-              let s_list = List.concat (make_subst para_ty_exp_l) in
+              let eqs_list = List.concat (make_eqs_list para_ty_exp_l) in
               let (s2, ty2) = ty_exp !tyenv exp2 in
-              let eqs = (eqs_of_subst s_list) @ (eqs_of_subst s2) in
+              let eqs = eqs_list @ (eqs_of_subst s2) in
               let s3 = unify eqs in
               (s3, subst_type s3 ty2)
         | (id, para, exp1) :: rest ->
@@ -145,7 +145,7 @@ let rec ty_exp tyenv = function
               let ranty = TyVar (fresh_tyvar ()) in
               let newtyenv = Environment.extend id (TyFun (domty, ranty)) !tyenv in
               tyenv := newtyenv;
-              ty_letrec_list rest tyenv ((para, domty, exp1) :: para_ty_exp_l) (id :: id_l) 
+              ty_letrec_list rest tyenv ((para, domty, ranty, exp1) :: para_ty_exp_l) (id :: id_l) 
       in
         ty_letrec_list l (ref tyenv) [] []
   | ListExp l ->
