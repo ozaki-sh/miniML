@@ -53,25 +53,54 @@ type ty =
   | TyBool
   | TyVar of tyvar
   | TyFun of ty * ty
+  | TyList of ty
 
 let alphabet_of_0to25 i = 
   if i >= 0 && i <= 25 then Char.escaped (char_of_int (i + 97))
   else "error"
 
-let string_of_tyvar tyvar =
-  let mod26 = tyvar mod 26 in
-  let quo26 = tyvar / 26 in
+let string_of_num num =
+  let mod26 = num mod 26 in
+  let quo26 = num / 26 in
   let alphabet = alphabet_of_0to25 mod26 in
   let suffix = if quo26 = 0 then "" else string_of_int quo26 in
   "'" ^ alphabet ^ suffix
 
-let rec string_of_ty = function
-    TyInt -> "int"
-  | TyBool -> "bool"
-  | TyVar tyvar -> string_of_tyvar tyvar
-  | TyFun (TyFun (_, _) as domty, ranty) -> "(" ^ (string_of_ty domty) ^ ")" ^
-                                            " -> " ^ (string_of_ty ranty)
-  | TyFun (domty, ranty) -> (string_of_ty domty) ^ " -> " ^ (string_of_ty ranty)
+let make_tyvar_string_list ty =
+  let counter = ref 0 in
+  let rec body_func ty ts_list =
+    let num = !counter in
+    match ty with
+      TyInt
+    | TyBool -> ts_list
+    | TyVar tyvar ->
+        if List.mem_assoc tyvar ts_list then ts_list
+        else (counter := num + 1; (tyvar, string_of_num num) :: ts_list)
+    | TyFun (domty, ranty) ->
+        let domty_ts_list = body_func domty ts_list in
+        let ranty_ts_list = body_func ranty domty_ts_list in
+        domty_ts_list @ ranty_ts_list
+    | TyList ty' -> body_func ty' ts_list
+  in
+    body_func ty []
+         
+
+let rec string_of_ty ty =
+  let tyvar_string_list = make_tyvar_string_list ty in
+  let rec body_func ty =
+    match ty with
+      TyInt -> "int"
+    | TyBool -> "bool"
+    | TyVar tyvar -> List.assoc tyvar tyvar_string_list
+    | TyFun (TyFun (_, _) as domty, ranty) -> "(" ^ (body_func domty) ^ ")" ^
+                                              " -> " ^ (body_func ranty)
+    | TyFun (domty, ranty) -> (body_func domty) ^ " -> " ^ (body_func ranty)
+    | TyList ty -> 
+       (match ty with
+          TyFun (_, _) -> "(" ^ (body_func ty) ^ ")" ^ " list"
+        | _ -> (body_func ty) ^ " list")
+  in
+    body_func ty
   
 
 (* pretty printing *)
@@ -91,3 +120,4 @@ let rec freevar_ty ty =
   | TyBool -> MySet.empty
   | TyVar tyvar -> MySet.singleton tyvar
   | TyFun (domty, ranty) -> MySet.union (freevar_ty domty) (freevar_ty ranty)
+  | TyList ty -> freevar_ty ty

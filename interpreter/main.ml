@@ -17,14 +17,8 @@ let rec read_eval_print env tyenv=
       let rec list_process exp_l ty_l env tyenv res_l =        
         match exp_l, ty_l with
           [], [] -> (env, tyenv, res_l)
-        | exp_h :: exp_outer_rest, ty_h :: ty_outer_rest ->
-            let rec list_list_process exp_l ty_l env tyenv res_l =
-             match exp_l, ty_l with
-                [], [] -> list_process exp_outer_rest ty_outer_rest env tyenv res_l
-              | ((_, newenv, _) as exp_set :: exp_inner_rest), ((_, newtyenv, _) as ty_set :: ty_inner_rest) ->
-                  list_list_process exp_inner_rest ty_inner_rest newenv newtyenv ((exp_set, ty_set) :: res_l)
-            in 
-              list_list_process exp_h ty_h env tyenv res_l
+        | ((_, newenv, _) as exp_set :: exp_rest), ((newtyenv, _) as ty_set :: ty_rest) ->
+              list_process exp_rest ty_rest newenv newtyenv ((exp_set, ty_set) :: res_l)
       in
         let (newenv, newtyenv, returned_result_list) = list_process decls tys env tyenv [] in
         let rec remove_duplication l id_l =
@@ -40,7 +34,7 @@ let rec read_eval_print env tyenv=
           let rec display l = 
             match l with
               [] -> read_eval_print newenv newtyenv
-            | ((id, _, v), (_, _, t)) :: rest ->
+            | ((id, _, v), (_, t)) :: rest ->
                 Printf.printf "val %s : " id;
                 pp_ty t; 
                 print_string " = ";
@@ -96,14 +90,8 @@ let read_eval_print_from_file env tyenv filename =
                 let rec list_process exp_l ty_l env tyenv res_l =        
                   match exp_l, ty_l with
                     [], [] -> (env, tyenv, res_l)
-                  | exp_h :: exp_outer_rest, ty_h :: ty_outer_rest ->
-                      let rec list_list_process exp_l ty_l env tyenv res_l =
-                        match exp_l, ty_l with
-                          [], [] -> list_process exp_outer_rest ty_outer_rest env tyenv res_l
-                        | ((_, newenv, _) as exp_set :: exp_inner_rest), ((_, newtyenv, _) as ty_set :: ty_inner_rest) ->
-                            list_list_process exp_inner_rest ty_inner_rest newenv newtyenv ((exp_set, ty_set) :: res_l)
-                      in 
-                        list_list_process exp_h ty_h env tyenv res_l
+                  | ((_, newenv, _) as exp_set :: exp_rest), ((newtyenv, _) as ty_set :: ty_rest) ->
+                      list_process exp_rest ty_rest newenv newtyenv ((exp_set, ty_set) :: res_l)
                 in
                   let (newenv, newtyenv, returned_result_list) = list_process decls tys env tyenv [] in
                   let rec remove_duplication l id_l =
@@ -119,7 +107,7 @@ let read_eval_print_from_file env tyenv filename =
                     let rec display l = 
                       match l with
                         [] -> inner_loop newenv newtyenv str_rest
-                      | ((id, _, v), (_, _, t)) :: rest ->
+                      | ((id, _, v), (_, t)) :: rest ->
                           Printf.printf "val %s : " id;
                           pp_ty t; 
                           print_string " = ";

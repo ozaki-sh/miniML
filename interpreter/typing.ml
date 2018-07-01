@@ -11,6 +11,7 @@ let rec subst_type (subst : subst) t =
     match t with
       TyVar tv' when tv = tv' -> ty
     | TyFun (domty, ranty) -> TyFun (subst_one_type (tv, ty) domty, subst_one_type (tv, ty) ranty)
+    | TyList ty' -> TyList (subst_one_type (tv, ty) ty')
     | _ -> t
   in
     match subst with
@@ -49,7 +50,10 @@ let ty_prim op ty1 ty2 = match op with
   | Mult -> ([(ty1, TyInt); (ty2, TyInt)], TyInt)
   | Lt -> ([(ty1, TyInt); (ty2, TyInt)], TyBool)
   | Eq -> ([(ty1, ty2)], TyBool)
-  | Cons -> err ("Noy Im")
+  | Cons -> 
+     (match ty2 with
+        TyList ty -> ([(ty, ty1)], ty2)
+      | _ -> err ("right side must be list: ::"))
 
 let ty_logic_prim op ty1 ty2 = match op with
     And -> ([(ty1, TyBool); (ty2, TyBool)], TyBool)
@@ -144,14 +148,27 @@ let rec ty_exp tyenv = function
               ty_letrec_list rest tyenv ((para, domty, exp1) :: para_ty_exp_l) (id :: id_l) 
       in
         ty_letrec_list l (ref tyenv) [] []
+  | ListExp l ->
+     (match l with
+        Emp -> ([], TyList (TyVar (fresh_tyvar ())))
+      | Cons (exp, l) ->
+          let (s1, ty1) = ty_exp tyenv exp in
+          let (s2, ty2) = ty_exp tyenv (ListExp l) in
+         (match ty2 with
+            TyList ty ->
+              let eqs = (eqs_of_subst s1) @ (eqs_of_subst s2) @ [(ty, ty1)] in
+              let s3 = unify eqs in
+              (s3, TyList (subst_type s3 ty1))
+          | _ -> err ("This error cannot happen")))
+ (* | MatchExp (exps, pattern_and_body_list)*)
   | _ -> err ("Not Implemented!")
 
 let ty_decl tyenv = function
-    Exp e -> let (_, ty) = ty_exp tyenv e in [[("-", tyenv, ty)]]
+    Exp e -> let (_, ty) = ty_exp tyenv e in [(tyenv, ty)]
   | Decls l ->
       let rec make_decl_ty_list l tyenv =
         match l with
-          [] -> [[]]
+          [] -> []
         | head :: outer_rest ->
             let rec make_anddecl_ty_list l tyenv' id_l =
              (match l with
@@ -163,16 +180,16 @@ let ty_decl tyenv = function
                  else
                    let (_, ty) = ty_exp !tyenv e in
                    let newtyenv = Environment.extend id ty tyenv' in
-                   (id, newtyenv, ty) :: make_anddecl_ty_list inner_rest newtyenv (id :: id_l))
+                   (newtyenv, ty) :: make_anddecl_ty_list inner_rest newtyenv (id :: id_l))
             in
               let and_list = make_anddecl_ty_list head !tyenv [] in
-              and_list :: make_decl_ty_list outer_rest tyenv
+              and_list @ make_decl_ty_list outer_rest tyenv
       in
         make_decl_ty_list l (ref tyenv)
   | RecDecls l ->
       let rec make_recdecl_ty_list l tyenv =
        (match l with
-          [] -> [[]]
+          [] -> []
         | head :: outer_rest ->
             let rec make_andrecdecl_ty_list l tyenv' para_ty_body_l id_l =
              (match l with
@@ -191,7 +208,7 @@ let ty_decl tyenv = function
                     | id :: id_rest, (_, domty, _) :: ptb_rest, (_, ranty) :: st_rest ->
                       let t = TyFun ((subst_type s domty), (subst_type s ranty)) in
                       let newtyenv = Environment.extend id t tyenv'' in
-                      (id, newtyenv, t) :: make_final_list s id_rest ptb_rest st_rest newtyenv
+                      (newtyenv, t) :: make_final_list s id_rest ptb_rest st_rest newtyenv
                   in
                     let subst_ty_list = make_subst_ty_list para_ty_body_l in
                     let eqs = List.concat (make_eqs subst_ty_list) in
@@ -207,6 +224,6 @@ let ty_decl tyenv = function
                     make_andrecdecl_ty_list inner_rest newtyenv ((para, domty, body) :: para_ty_body_l) (id :: id_l))
             in
               let and_list = make_andrecdecl_ty_list head !tyenv [] [] in
-              and_list :: make_recdecl_ty_list outer_rest tyenv)
+              and_list @ make_recdecl_ty_list outer_rest tyenv)
       in
         make_recdecl_ty_list l (ref tyenv)

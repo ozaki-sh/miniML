@@ -210,11 +210,11 @@ and eval_exp env = function
           
 
 let eval_decl env = function
-    Exp e -> let v = eval_exp env e in [[("-", env, v)]]
+    Exp e -> let v = eval_exp env e in [("-", env, v)]
   | Decls l ->
       let rec make_decl_list l env =
      (match l with
-        [] -> [[]]
+        [] -> []
       | head :: outer_rest -> 
           let rec make_anddecl_list l env' id_l =
            (match l with
@@ -229,13 +229,13 @@ let eval_decl env = function
                     (id, newenv, v) :: make_anddecl_list inner_rest newenv (id :: id_l))
            in
              let and_list = make_anddecl_list head !env [] in
-               and_list :: make_decl_list outer_rest env)
+               and_list @ make_decl_list outer_rest env)
       in
         make_decl_list l (ref env)
   | RecDecls l ->
       let rec make_recdecl_list l env =
      (match l with
-        [] -> [[]]
+        [] -> []
       | head :: outer_rest ->
           let rec make_andrecdecl_list l env id_l =
            (match l with
@@ -250,7 +250,7 @@ let eval_decl env = function
                     (id, newenv, v) :: make_andrecdecl_list inner_rest env (id :: id_l))
           in
             let and_list = make_andrecdecl_list head env [] in
-              and_list :: make_recdecl_list outer_rest env)
+              and_list @ make_recdecl_list outer_rest env)
       in
         make_recdecl_list l (ref env)
                   
