@@ -163,7 +163,7 @@ and eval_exp env = function
             ConsV (value, eval_list rest)
       in
         ListV (eval_list lexp)
-  | MatchExp (exps, pattern_and_body_list) ->
+  (*| MatchExp (exps, pattern_and_body_list) ->
       (* マッチする対象を評価 *)
       let rec eval_exps = function
           [] -> []
@@ -206,7 +206,16 @@ and eval_exp env = function
               let newenv = Environment.extend id value env in
               bind_and_return_env newenv rest 
         in
-          outer_loop pattern_and_body_list
+          outer_loop pattern_and_body_list*)
+  | MatchExp (exp1, exp2, id1, id2, exp3) ->
+      let value1 = eval_exp env exp1 in
+      match value1 with
+        ListV EmpV -> eval_exp env exp2
+      | ListV (ConsV (value, l)) ->
+          let newenv = Environment.extend id1 value env in
+          let newerenv = Environment.extend id2 (ListV l) newenv in
+          eval_exp newerenv exp3
+      | _ -> err ("Not matched")
           
 
 let eval_decl env = function

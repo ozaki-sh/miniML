@@ -31,12 +31,13 @@ type exp =
   | LetRecExp of (id * id * exp) list * exp
   | ListExp of listExp
   (* ListExp(Cons(ILit 1, (Cons(ILit 2, Emp)))) --> [1;2] *)
-  | MatchExp of exp list * (exp list * exp) list
+ (* | MatchExp of exp list * (exp list * exp) list
   (* MatchExp([ILit 1; ILit 2],
               [([ILit 0; ILit 1], ILit 0); ([ILit 1; ILit 2], ILit 1)]) -->
      match 1, 2 with
        0, 1 -> 0
-     | 1, 2 -> 1 *)
+     | 1, 2 -> 1 *)*)
+  | MatchExp of exp * exp * id * id * exp
   | Wildcard (* Wildcard --> _ *)
 and listExp = Emp | Cons of exp * listExp
 

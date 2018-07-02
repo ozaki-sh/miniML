@@ -191,7 +191,7 @@ let rec ty_exp tyenv = function
               let s3 = unify eqs in
               (s3, TyList (subst_type s3 ty1))
           | _ -> err ("This error cannot happen")))
-  | MatchExp (exps, pattern_and_body_list) ->
+(*  | MatchExp (exps, pattern_and_body_list) ->
       let rec ty_exps = function
           [] -> []
         | head :: rest ->
@@ -241,7 +241,18 @@ let rec ty_exp tyenv = function
           let eqs3 = make_ty_eqs_list tys2 in
           let eqs = eqs1 @ eqs2 @ eqs3 in
           let s = unify eqs in
-          (s, subst_type s (List.hd tys2))
+          (s, subst_type s (List.hd tys2))*)
+  | MatchExp (exp1, exp2, id1, id2, exp3) ->
+      let (s1, ty1) = ty_exp tyenv exp1 in
+      let (s2, ty2) = ty_exp tyenv exp2 in
+      let newTyVar = TyVar (fresh_tyvar ()) in
+      let newtyenv = Environment.extend id1 newTyVar tyenv in
+      let newertyenv = Environment.extend id2 (TyList newTyVar) newtyenv in
+      let (s3, ty3) = ty_exp newertyenv exp3 in
+      let eqs = (eqs_of_subst s1) @ (eqs_of_subst s2) 
+                 @ (eqs_of_subst s3) @ [(ty2, ty3); (ty1, TyList newTyVar)] in
+      let s4 = unify eqs in
+      (s4, subst_type s4 ty3)
   | _ -> err ("Not Implemented!")
 
 let ty_decl tyenv = function
