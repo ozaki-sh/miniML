@@ -175,10 +175,6 @@ LetRecAndExpr :
   | f=ID fe=LetFunExpr IN e2=Expr { match fe with FunExp (p, e1) -> ([(f, p, e1)], e2) }
 
 MatchExpr :
-    MATCH e1=Expr WITH LSTLPRN LSTRPRN RARROW e2=Expr BAR x=ID CONS y=ID RARROW e3=Expr
-      { MatchExp (e1, e2, x, y, e3) }
-
-(*MatchExpr :
     MATCH e1=Expr e2=list(MoreExpr) WITH option(BAR) e3=PatternMatchExpr { MatchExp (e1 :: e2, e3) }
  
 MoreExpr :
@@ -222,7 +218,7 @@ MorePattern :
     COMMA pt=Pattern { pt }
 
 MorePatterns :
-    BAR pt=Patterns { pt }*)
+    BAR pt=Patterns { pt }
 
 
 
