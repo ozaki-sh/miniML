@@ -34,6 +34,7 @@ let rec unify = function
      (match ty1, ty2 with
         x, y when x = y -> unify rest
       | TyFun (dty1, rty1), TyFun (dty2, rty2) -> unify ((dty1, dty2) :: (rty1, rty2) :: rest)
+      | TyList ty', TyList ty'' -> unify ((ty', ty'') :: rest)
       | TyVar alpha, _ ->
           if MySet.member alpha (freevar_ty ty2) then err ("Type error")
           else (alpha, ty2) :: unify (subst_eqs [(alpha, ty2)] rest)
@@ -43,6 +44,36 @@ let rec unify = function
       | _ -> err ("Type error"))
       
 
+let rec pattern_match pattern ty =
+  match pattern, ty with
+    ILit _, TyInt -> ([], [])
+  | ILit _, TyVar tyvar -> ([], [(tyvar, TyInt)])
+  | BLit _, TyBool -> ([], [])
+  | BLit _, TyVar tyvar -> ([], [(tyvar, TyBool)])
+  | Var id, _ -> ([(id, ty)], [])
+  | ListExp Emp, TyList _ -> ([], [])
+  | ListExp Emp, TyVar tyvar -> ([], [(tyvar, TyList (TyVar (fresh_tyvar ())))])
+  | ListExp (Cons (pt, Emp)), TyList ty' -> pattern_match pt ty'
+  | ListExp (Cons (pt, Emp)), TyVar tyvar -> 
+      let newTyVar = TyVar (fresh_tyvar ()) in
+      let (id_and_ty_list, subst_list) = pattern_match pt newTyVar in
+      (id_and_ty_list, (tyvar, TyList newTyVar) :: subst_list)
+  | ListExp (Cons (pt1, (Cons (pt2, Emp)))), TyList ty' ->
+      let (id_and_ty_list1, subst_list1) = pattern_match pt1 ty' in
+      let (id_and_ty_list2, subst_list2) = pattern_match pt2 ty in
+      (id_and_ty_list1 @ id_and_ty_list2, subst_list1 @ subst_list2)
+  | ListExp (Cons (pt1, (Cons (pt2, Emp)))), TyVar tyvar ->
+      let newTyVar = TyVar (fresh_tyvar ()) in
+      let (id_and_ty_list1, subst_list1) = pattern_match pt1 newTyVar in
+      let (id_and_ty_list2, subst_list2) = pattern_match pt2 ty in
+      (id_and_ty_list1 @ id_and_ty_list2, (tyvar, TyList newTyVar) :: (subst_list1 @ subst_list2))
+  | Wildcard, _ -> ([], [])
+  | _ -> err ("expression must have same type as pattern")
+
+let rec make_ty_eqs_list = function
+    [] -> []
+  | [ty] -> []
+  | ty1 :: ty2 :: rest -> (ty1, ty2) :: make_ty_eqs_list (ty2 :: rest)
 
 let ty_prim op ty1 ty2 = match op with
     Plus -> ([(ty1, TyInt); (ty2, TyInt)], TyInt)
@@ -160,7 +191,57 @@ let rec ty_exp tyenv = function
               let s3 = unify eqs in
               (s3, TyList (subst_type s3 ty1))
           | _ -> err ("This error cannot happen")))
- (* | MatchExp (exps, pattern_and_body_list)*)
+  | MatchExp (exps, pattern_and_body_list) ->
+      let rec ty_exps = function
+          [] -> []
+        | head :: rest ->
+            (ty_exp tyenv head) :: ty_exps rest
+      in
+        let subst_ty_list1 = ty_exps exps in
+        let (subst_list1, tys1) = List.split subst_ty_list1 in
+        let subst1 = List.concat subst_list1 in
+        let eqs1 = eqs_of_subst subst1 in
+        let rec outer_loop = function
+            [] -> []
+          | (patterns, body) :: rest ->
+              let (id_and_ty_list, subst_list) = inner_loop patterns tys1 in
+              if check_whether_duplication id_and_ty_list [] then
+                err ("one variable is bound several times in this expression")
+              else
+                let newtyenv = bind_and_return_tyenv tyenv id_and_ty_list in
+                let (subst, ty) = ty_exp newtyenv body in
+                (subst @ subst_list, ty) :: outer_loop rest
+        (* パターン列を順にマッチさせていく *)
+        and inner_loop pt_l ty_l =
+          match pt_l, ty_l with
+            [pattern], [ty] -> pattern_match pattern ty
+          | (pattern :: pattern_rest), (ty :: ty_rest) ->
+              let (id_and_ty_list1, subst_list1) = pattern_match pattern ty in
+              let (id_and_ty_list2, subst_list2) = inner_loop pattern_rest ty_rest in
+              (id_and_ty_list1 @ id_and_ty_list2, subst_list1 @ subst_list2)
+          | _, _ -> err ("The number of patterns must be same as the number of expressions")
+        (* 同一パターン列の中に同じ変数が現れてないかをチェック *)
+        and check_whether_duplication checked_l id_l =
+          match checked_l with
+            [] -> false
+          | (id, _) :: rest ->
+              if List.exists (fun x -> x = id) id_l then true
+              else check_whether_duplication rest (id :: id_l)
+        (* パターンマッチの結果束縛する必要がある変数を束縛した環境を返す *)
+        and bind_and_return_tyenv tyenv = function
+            [] -> tyenv
+          | (id, ty) :: rest ->
+              let newtyenv = Environment.extend id ty tyenv in
+              bind_and_return_tyenv newtyenv rest 
+        in
+          let subst_ty_list2 = outer_loop pattern_and_body_list in
+          let (subst_list2, tys2) = List.split subst_ty_list2 in
+          let subst2 = List.concat subst_list2 in
+          let eqs2 = eqs_of_subst subst2 in
+          let eqs3 = make_ty_eqs_list tys2 in
+          let eqs = eqs1 @ eqs2 @ eqs3 in
+          let s = unify eqs in
+          (s, subst_type s (List.hd tys2))
   | _ -> err ("Not Implemented!")
 
 let ty_decl tyenv = function
