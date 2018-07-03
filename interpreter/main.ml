@@ -132,9 +132,9 @@ let initial_env =
       (Environment.extend "x" (IntV 10) Environment.empty))
 
 let initial_tyenv =
-  Environment.extend "i" TyInt
-    (Environment.extend "v" TyInt
-      (Environment.extend "x" TyInt Environment.empty))
+  Environment.extend "i" (TyScheme ([], TyInt))
+    (Environment.extend "v" (TyScheme ([], TyInt))
+      (Environment.extend "x" (TyScheme ([], TyInt)) Environment.empty))
 
 let _ = 
   try 

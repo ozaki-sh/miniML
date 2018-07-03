@@ -1,6 +1,7 @@
 open Syntax
 
 type subst = (tyvar * ty) list
+type tyenv = tysc Environment.t
 
 exception Error of string
 
@@ -42,6 +43,19 @@ let rec unify = function
           if MySet.member alpha (freevar_ty ty1) then err ("Type error")
           else (alpha, ty1) :: unify (subst_eqs [(alpha, ty1)] rest)
       | _ -> err ("Type error"))
+
+let rec freevar_tyenv (tyenv : tyenv) =
+  Environment.fold_right (fun x y -> MySet.union (freevar_tysc x) y) tyenv MySet.empty
+
+let closure ty (tyenv : tyenv) subst =
+  let fv_tyenv' = freevar_tyenv tyenv in
+  let fv_tyenv =
+    MySet.bigunion
+      (MySet.map
+        (fun id -> freevar_ty (subst_type subst (TyVar id))) 
+        fv_tyenv') in
+  let ids = MySet.diff (freevar_ty ty) fv_tyenv in
+    TyScheme (MySet.to_list ids, ty)
       
 
 let rec pattern_match pattern ty =
@@ -93,8 +107,11 @@ let ty_logic_prim op ty1 ty2 = match op with
 
 let rec ty_exp tyenv = function
     Var x -> 
-      (try ([], Environment.lookup x tyenv) with
-         Environment.Not_bound -> err ("variable not bound: " ^ x))
+      (try
+        let TyScheme (vars, ty) = Environment.lookup x tyenv in
+        let s = List.map (fun id -> (id, TyVar (fresh_tyvar ()))) vars in
+          ([], subst_type s ty)
+       with Environment.Not_bound -> err ("variable not bound: " ^ x))
   | ILit _ -> ([], TyInt)
   | BLit _ -> ([], TyBool)
   | BinOp (op, exp1, exp2)->
@@ -131,13 +148,14 @@ let rec ty_exp tyenv = function
               err ("one variable is bound several times in this expression")
             else
               let (s1, ty1) = ty_exp tyenv exp1 in
-              let newtyenv = Environment.extend id ty1 tyenv' in
+              let tysc = closure ty1 tyenv [] in
+              let newtyenv = Environment.extend id tysc tyenv' in
               ty_let_list rest newtyenv (s1 @ subst) (id :: id_l) 
       in
         ty_let_list l tyenv [] []
   | FunExp (id, exp) ->
       let domty = TyVar (fresh_tyvar ()) in
-      let (s, ranty) = ty_exp (Environment.extend id domty tyenv) exp in
+      let (s, ranty) = ty_exp (Environment.extend id (TyScheme ([], domty)) tyenv) exp in
       (s, TyFun (subst_type s domty, ranty))
   | AppExp (exp1, exp2) ->
       let (s1, ty1) = ty_exp tyenv exp1 in
@@ -161,21 +179,30 @@ let rec ty_exp tyenv = function
             let rec make_eqs_list = function
                 [] -> []
               | (para, domty, ranty, exp) :: rest ->
-                  let (s, t) = ty_exp (Environment.extend para domty !tyenv) exp in
+                  let (s, t) = ty_exp (Environment.extend para (TyScheme ([], domty)) !tyenv) exp in
                   (eqs_of_subst s) :: [(t, ranty)] :: make_eqs_list rest
             in
               let eqs_list = List.concat (make_eqs_list para_ty_exp_l) in
-              let (s2, ty2) = ty_exp !tyenv exp2 in
-              let eqs = eqs_list @ (eqs_of_subst s2) in
-              let s3 = unify eqs in
-              (s3, subst_type s3 ty2)
+              let rec make_newtyenv id_l tyenv' =
+                match id_l with
+                  [] -> !tyenv
+                | id :: rest ->
+                    let TyScheme (_, ty) = Environment.lookup id !tyenv in
+                    let tysc = closure ty !tyenv [] in
+                    make_newtyenv rest (Environment.extend id tysc tyenv')
+              in
+                let newtyenv = make_newtyenv id_l !tyenv in
+                let (s2, ty2) = ty_exp newtyenv exp2 in
+                let eqs = eqs_list @ (eqs_of_subst s2) in
+                let s3 = unify eqs in
+                (s3, subst_type s3 ty2)
         | (id, para, exp1) :: rest ->
             if List.exists (fun x -> x = id) id_l then
               err ("one variable is bound several times in this expression")
             else
               let domty = TyVar (fresh_tyvar ()) in
               let ranty = TyVar (fresh_tyvar ()) in
-              let newtyenv = Environment.extend id (TyFun (domty, ranty)) !tyenv in
+              let newtyenv = Environment.extend id (TyScheme ([], (TyFun (domty, ranty)))) !tyenv in
               tyenv := newtyenv;
               ty_letrec_list rest tyenv ((para, domty, ranty, exp1) :: para_ty_exp_l) (id :: id_l) 
       in
@@ -232,7 +259,7 @@ let rec ty_exp tyenv = function
         and bind_and_return_tyenv tyenv = function
             [] -> tyenv
           | (id, ty) :: rest ->
-              let newtyenv = Environment.extend id ty tyenv in
+              let newtyenv = Environment.extend id (TyScheme ([], ty)) tyenv in
               bind_and_return_tyenv newtyenv rest 
         in
           let subst_ty_list2 = outer_loop pattern_and_body_list in
@@ -261,7 +288,8 @@ let ty_decl tyenv = function
                    err ("one variable is bound several times in this expression")
                  else
                    let (_, ty) = ty_exp !tyenv e in
-                   let newtyenv = Environment.extend id ty tyenv' in
+                   let tysc = closure ty !tyenv [] in
+                   let newtyenv = Environment.extend id tysc tyenv' in
                    (newtyenv, ty) :: make_anddecl_ty_list inner_rest newtyenv (id :: id_l))
             in
               let and_list = make_anddecl_ty_list head !tyenv [] in
@@ -279,7 +307,7 @@ let ty_decl tyenv = function
                   let rec make_subst_ty_list = function
                       [] -> []
                     | (para, ty, body) :: rest ->
-                        let (s, t) = ty_exp (Environment.extend para ty tyenv') body in
+                        let (s, t) = ty_exp (Environment.extend para (TyScheme ([], ty)) tyenv') body in
                         (s, t) :: make_subst_ty_list rest 
                   and make_eqs = function
                       [] -> [[]]
@@ -289,7 +317,8 @@ let ty_decl tyenv = function
                       [], [], [] -> tyenv := tyenv''; []
                     | id :: id_rest, (_, domty, _) :: ptb_rest, (_, ranty) :: st_rest ->
                       let t = TyFun ((subst_type s domty), (subst_type s ranty)) in
-                      let newtyenv = Environment.extend id t tyenv'' in
+                      let tysc = closure t !tyenv [] in
+                      let newtyenv = Environment.extend id tysc tyenv'' in
                       (newtyenv, t) :: make_final_list s id_rest ptb_rest st_rest newtyenv
                   in
                     let subst_ty_list = make_subst_ty_list para_ty_body_l in
@@ -302,7 +331,7 @@ let ty_decl tyenv = function
                   else
                     let domty = TyVar (fresh_tyvar ()) in
                     let ranty = TyVar (fresh_tyvar ()) in
-                    let newtyenv = Environment.extend id (TyFun (domty, ranty)) tyenv' in
+                    let newtyenv = Environment.extend id (TyScheme ([], (TyFun (domty, ranty)))) tyenv' in
                     make_andrecdecl_ty_list inner_rest newtyenv ((para, domty, body) :: para_ty_body_l) (id :: id_l))
             in
               let and_list = make_andrecdecl_ty_list head !tyenv [] [] in

@@ -55,6 +55,10 @@ type ty =
   | TyFun of ty * ty
   | TyList of ty
 
+type tysc = TyScheme of tyvar list * ty
+
+let tysc_of_ty ty = TyScheme ([], ty)
+
 let alphabet_of_0to25 i = 
   if i >= 0 && i <= 25 then Char.escaped (char_of_int (i + 97))
   else "error"
@@ -121,3 +125,10 @@ let rec freevar_ty ty =
   | TyVar tyvar -> MySet.singleton tyvar
   | TyFun (domty, ranty) -> MySet.union (freevar_ty domty) (freevar_ty ranty)
   | TyList ty -> freevar_ty ty
+
+let freevar_tysc tysc =
+  match tysc with
+    TyScheme (tyvar_list, ty) ->
+      let freevar_in_ty = freevar_ty ty in
+      let boundty = MySet.from_list tyvar_list in
+      MySet.diff freevar_in_ty boundty
