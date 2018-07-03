@@ -173,25 +173,25 @@ let rec ty_exp tyenv = function
           (s3, subst_type s3 ranty)
       | _ -> err ("Non-function value is applied"))
   | LetRecExp (l, exp2) ->
-      let rec ty_letrec_list l tyenv para_ty_exp_l id_l =
+      let rec ty_letrec_list l tyenv1 para_ty_exp_l id_l =
         match l with
           [] -> 
             let rec make_eqs_list = function
                 [] -> []
               | (para, domty, ranty, exp) :: rest ->
-                  let (s, t) = ty_exp (Environment.extend para (TyScheme ([], domty)) !tyenv) exp in
+                  let (s, t) = ty_exp (Environment.extend para (TyScheme ([], domty)) !tyenv1) exp in
                   (eqs_of_subst s) :: [(t, ranty)] :: make_eqs_list rest
             in
               let eqs_list = List.concat (make_eqs_list para_ty_exp_l) in
-              let rec make_newtyenv id_l tyenv' =
+              let rec make_newtyenv id_l =
                 match id_l with
-                  [] -> !tyenv
+                  [] -> tyenv
                 | id :: rest ->
-                    let TyScheme (_, ty) = Environment.lookup id !tyenv in
-                    let tysc = closure ty !tyenv [] in
-                    make_newtyenv rest (Environment.extend id tysc tyenv')
+                    let TyScheme (_, ty) = Environment.lookup id !tyenv1 in
+                    let tysc = closure ty tyenv [] in
+                    Environment.extend id tysc (make_newtyenv rest)
               in
-                let newtyenv = make_newtyenv id_l !tyenv in
+                let newtyenv = make_newtyenv id_l in
                 let (s2, ty2) = ty_exp newtyenv exp2 in
                 let eqs = eqs_list @ (eqs_of_subst s2) in
                 let s3 = unify eqs in
@@ -202,9 +202,9 @@ let rec ty_exp tyenv = function
             else
               let domty = TyVar (fresh_tyvar ()) in
               let ranty = TyVar (fresh_tyvar ()) in
-              let newtyenv = Environment.extend id (TyScheme ([], (TyFun (domty, ranty)))) !tyenv in
-              tyenv := newtyenv;
-              ty_letrec_list rest tyenv ((para, domty, ranty, exp1) :: para_ty_exp_l) (id :: id_l) 
+              let newtyenv = Environment.extend id (TyScheme ([], (TyFun (domty, ranty)))) !tyenv1 in
+              tyenv1 := newtyenv;
+              ty_letrec_list rest tyenv1 ((para, domty, ranty, exp1) :: para_ty_exp_l) (id :: id_l) 
       in
         ty_letrec_list l (ref tyenv) [] []
   | ListExp l ->
