@@ -98,7 +98,8 @@ let ty_prim op ty1 ty2 = match op with
   | Cons -> 
      (match ty1, ty2 with
         TyList (TyVar alpha), TyList (TyVar beta) when alpha = beta -> ([], TyList ty2)
-      | _, TyList ty -> ([ty, ty1], ty2)
+      | _, TyList _
+      | _, TyVar _ -> ([(TyList ty1, ty2)], TyList ty1)
       | _ -> err ("right side must be list: ::"))
 
 let ty_logic_prim op ty1 ty2 = match op with
@@ -188,7 +189,7 @@ let rec ty_exp tyenv = function
                   [] -> tyenv
                 | id :: rest ->
                     let TyScheme (_, ty) = Environment.lookup id !tyenv1 in
-                    let tysc = closure ty tyenv [] in
+                    let tysc = closure (subst_type (unify eqs_list) ty) tyenv [] in
                     Environment.extend id tysc (make_newtyenv rest)
               in
                 let newtyenv = make_newtyenv id_l in
@@ -301,38 +302,35 @@ let ty_decl tyenv = function
        (match l with
           [] -> []
         | head :: outer_rest ->
-            let rec make_andrecdecl_ty_list l tyenv' para_ty_body_l id_l =
+            let rec make_andrecdecl_ty_list l and_tyenv para_ty_body_l id_l =
              (match l with
                 [] -> 
-                  let rec make_subst_ty_list = function
+                  let rec make_eqs = function
                       [] -> []
-                    | (para, ty, body) :: rest ->
-                        let (s, t) = ty_exp (Environment.extend para (TyScheme ([], ty)) tyenv') body in
-                        (s, t) :: make_subst_ty_list rest 
-                  and make_eqs = function
-                      [] -> [[]]
-                    | (s, _) :: rest -> (eqs_of_subst s) :: make_eqs rest
-                  and make_final_list s id_l ptb_l st_l tyenv'' =
-                    match id_l, ptb_l, st_l with
-                      [], [], [] -> tyenv := tyenv''; []
-                    | id :: id_rest, (_, domty, _) :: ptb_rest, (_, ranty) :: st_rest ->
-                      let t = TyFun ((subst_type s domty), (subst_type s ranty)) in
-                      let tysc = closure t !tyenv [] in
+                    | (para, domty, ranty, body) :: rest ->
+                        let (s, t) = ty_exp (Environment.extend para (TyScheme ([], domty)) and_tyenv) body in
+                        (eqs_of_subst s) :: [(t, ranty)] :: make_eqs rest 
+                  and make_final_list s id_l tyenv'' =
+                    match id_l with
+                      [] -> tyenv := tyenv''; []
+                    | id :: id_rest ->
+                      let TyScheme (_, ty) = Environment.lookup id and_tyenv in
+                      let newty = subst_type s ty in
+                      let tysc = closure newty !tyenv [] in
                       let newtyenv = Environment.extend id tysc tyenv'' in
-                      (newtyenv, t) :: make_final_list s id_rest ptb_rest st_rest newtyenv
+                      (newtyenv, newty) :: make_final_list s id_rest newtyenv
                   in
-                    let subst_ty_list = make_subst_ty_list para_ty_body_l in
-                    let eqs = List.concat (make_eqs subst_ty_list) in
+                    let eqs = List.concat (make_eqs para_ty_body_l) in
                     let s = unify eqs in
-                    make_final_list s id_l para_ty_body_l subst_ty_list tyenv'                
+                    make_final_list s id_l and_tyenv                
               | (id, para, body) :: inner_rest ->
                   if List.exists (fun x -> x = id) id_l then
                     err ("one variable is bound several times in this expression")
                   else
                     let domty = TyVar (fresh_tyvar ()) in
                     let ranty = TyVar (fresh_tyvar ()) in
-                    let newtyenv = Environment.extend id (TyScheme ([], (TyFun (domty, ranty)))) tyenv' in
-                    make_andrecdecl_ty_list inner_rest newtyenv ((para, domty, body) :: para_ty_body_l) (id :: id_l))
+                    let newtyenv = Environment.extend id (TyScheme ([], (TyFun (domty, ranty)))) and_tyenv in
+                    make_andrecdecl_ty_list inner_rest newtyenv ((para, domty, ranty, body) :: para_ty_body_l) (id :: id_l))
             in
               let and_list = make_andrecdecl_ty_list head !tyenv [] [] in
               and_list @ make_recdecl_ty_list outer_rest tyenv)
