@@ -111,6 +111,15 @@ let rec string_of_ty ty =
 let pp_ty ty = print_string (string_of_ty ty)
 
 
+let string_of_tysc (TyScheme (tyvarlist, ty)) =
+  let tyvar_string_list = make_tyvar_string_list ty in
+  let string_of_tyvar tyvar = List.assoc tyvar tyvar_string_list in
+  "[" ^ (List.fold_right (fun x y -> x ^ ", " ^ y) (List.map (string_of_tyvar) tyvarlist) "") ^ "|" ^ (string_of_ty ty) ^ "]" 
+    
+
+let pp_tysc tysc = print_string (string_of_tysc tysc)
+
+
 let fresh_tyvar =
   let counter = ref 0 in
   let body () =
