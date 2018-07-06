@@ -227,8 +227,6 @@ let rec ty_exp tyenv = function
                     print_string (string_of_eqs (eqs_of_subst (unify eqs_list)));
                     print_newline();
                     let ty' = subst_type (unify eqs_list) ty in
-                    pp_ty ty';
-                    print_newline();
                     let tysc = closure ty' tyenv [] in
                     Environment.extend id tysc (make_newtyenv rest)
               in
