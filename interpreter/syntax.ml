@@ -57,6 +57,15 @@ type ty =
 
 type tysc = TyScheme of tyvar list * ty
 
+type attached_tyvar = string
+
+type attached_ty =
+    Tyint
+  | Tybool
+  | Tyvar of attached_tyvar
+  | Tyfun of attached_ty * attached_ty
+  | Tylist of attached_ty
+
 let tysc_of_ty ty = TyScheme ([], ty)
 
 let alphabet_of_0to25 i = 

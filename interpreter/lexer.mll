@@ -2,13 +2,16 @@
 let reservedWords = [
   (* Keywords *)
   ("and", Parser.LETAND);
+  ("bool", Parser.BOOL);
   ("dfun", Parser.DFUN);
   ("else", Parser.ELSE);
   ("false", Parser.FALSE);
   ("fun", Parser.FUN);
   ("if", Parser.IF);
   ("in", Parser.IN);
+  ("int", Parser.INT);
   ("let", Parser.LET);
+  ("list", Parser.LIST);
   ("match", Parser.MATCH);
   ("rec", Parser.REC);
   ("then", Parser.THEN);
@@ -44,6 +47,7 @@ rule main = parse
 | ";" { Parser.SEMI }
 | "," { Parser.COMMA }
 | "_" { Parser.UNDERSCORE }
+| ":" { Parser.COLON }
 
 | ['a'-'z'] ['a'-'z' '0'-'9' '_' '\'']*
     { let id = Lexing.lexeme lexbuf in
@@ -52,6 +56,10 @@ rule main = parse
       with
       _ -> Parser.ID id
      }
+
+| ['''] ['a'-'z'] ['a'-'z' '0'-'9' '_']*
+    { let tyvar = Lexing.lexeme lexbuf in Parser.TYVAR tyvar }
+
 | eof { exit 0 }
 
 and comment i = parse

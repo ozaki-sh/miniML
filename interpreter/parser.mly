@@ -12,9 +12,12 @@ open Syntax
 %token MATCH WITH BAR
 %token LSTLPRN LSTRPRN CONS SEMI
 %token COMMA UNDERSCORE
+%token COLON
+%token INT BOOL LIST
 
 %token <int> INTV
 %token <Syntax.id> ID
+%token <string> TYVAR
 
 %start toplevel
 %type <Syntax.program> toplevel
@@ -219,6 +222,17 @@ MorePattern :
 
 MorePatterns :
     BAR pt=Patterns { pt }
+
+Type :
+    INT { Tyint }
+  | BOOL { Tybool }
+  | tv=TYVAR { Tyvar tv }
+  | ty1=Type RARROW ty2=Type { TyFun (ty1, ty2) } 
+  | ty=Type LIST { Tylist ty }
+  | LPAREN ty=Type RPAREN { ty }
+
+WithType :
+    COLON ty=Type { ty }
 
 
 

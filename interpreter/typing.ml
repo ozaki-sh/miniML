@@ -351,7 +351,7 @@ let ty_decl tyenv = function
                     | id :: id_rest ->
                       let TyScheme (_, ty) = Environment.lookup id and_tyenv in
                       let newty = subst_type s ty in
-                      let tysc = closure newty !tyenv [] in
+                      let tysc = closure newty !tyenv s in
                       let newtyenv = Environment.extend id tysc tyenv'' in
                       (newtyenv, newty) :: make_final_list s id_rest newtyenv
                   in
