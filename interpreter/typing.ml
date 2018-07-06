@@ -224,8 +224,7 @@ let rec ty_exp tyenv = function
                   [] -> tyenv
                 | id :: rest ->
                     let TyScheme (_, ty) = Environment.lookup id tyenv' in
-                    let ty' = subst_type (unify eqs_list) ty in
-                    let tysc = closure ty' tyenv [] in
+                    let tysc = closure ty tyenv (unify eqs_list) in
                     Environment.extend id tysc (make_newtyenv rest)
               in
                 let newtyenv = make_newtyenv id_l in
@@ -323,8 +322,8 @@ let ty_decl tyenv = function
                  if List.exists (fun x -> x = id) id_l then
                    err ("one variable is bound several times in this expression")
                  else
-                   let (_, ty) = ty_exp !tyenv e in
-                   let tysc = closure ty !tyenv [] in
+                   let (s, ty) = ty_exp !tyenv e in
+                   let tysc = closure ty !tyenv s in
                    let newtyenv = Environment.extend id tysc tyenv' in
                    (newtyenv, ty) :: make_anddecl_ty_list inner_rest newtyenv (id :: id_l))
             in
