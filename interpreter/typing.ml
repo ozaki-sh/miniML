@@ -184,7 +184,7 @@ let rec ty_exp tyenv = function
               err ("one variable is bound several times in this expression")
             else
               let (s1, ty1) = ty_exp tyenv exp1 in
-              let tysc = closure ty1 tyenv [] in
+              let tysc = closure ty1 tyenv s1 in
               let newtyenv = Environment.extend id tysc tyenv' in
               ty_let_list rest newtyenv (s1 @ subst) (id :: id_l) 
       in
@@ -218,27 +218,24 @@ let rec ty_exp tyenv = function
                   let (s, t) = ty_exp (Environment.extend para (TyScheme ([], domty)) tyenv') exp in
                   (eqs_of_subst s) :: [(t, ranty)] :: make_eqs_list rest
             in
-              print_string (string_of_tyenv id_l tyenv');
-              print_newline();
               let eqs_list = List.concat (make_eqs_list para_ty_exp_l) in
               let rec make_newtyenv id_l =                
                 match id_l with
                   [] -> tyenv
                 | id :: rest ->
                     let TyScheme (_, ty) = Environment.lookup id tyenv' in
-                    let tysc = closure (subst_type (unify eqs_list) ty) tyenv [] in
+                    print_string (string_of_eqs (eqs_of_subst (unify eqs_list)));
+                    print_newline();
+                    let ty' = subst_type (unify eqs_list) ty in
+                    pp_ty ty';
+                    print_newline();
+                    let tysc = closure ty' tyenv [] in
                     Environment.extend id tysc (make_newtyenv rest)
               in
                 let newtyenv = make_newtyenv id_l in
-                print_string (string_of_tyenv id_l newtyenv);
-                print_newline();
                 let (s2, ty2) = ty_exp newtyenv exp2 in
                 let eqs = eqs_list @ (eqs_of_subst s2) in
-                print_string (string_of_eqs eqs);
-                print_newline();
                 let s3 = unify eqs in
-                print_string (string_of_eqs (eqs_of_subst s3));
-                print_newline();
                 (s3, subst_type s3 ty2)
         | (id, para, exp1) :: rest ->
             if List.exists (fun x -> x = id) id_l then
