@@ -225,7 +225,7 @@ let rec ty_exp tyenv = function
                 | id :: rest ->
                     let TyScheme (_, ty) = Environment.lookup id tyenv' in
                     let s = unify eqs_list in
-                    let tysc = closure (subst_type ty) tyenv s in
+                    let tysc = closure (subst_type s ty) tyenv s in
                     Environment.extend id tysc (make_newtyenv rest)
               in
                 let newtyenv = make_newtyenv id_l in
