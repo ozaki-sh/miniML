@@ -53,9 +53,9 @@ let rec pattern_match pattern value =
   | BLit b1, BoolV b2 when (b1 = b2) -> []
   | Var x, _ -> [(x, value)]
   | ListExp Emp, ListV EmpV -> []
-  | ListExp (Cons (pt, Emp)), ListV (ConsV (v, EmpV))
+  | ListExp (Cons ((pt, _), Emp)), ListV (ConsV (v, EmpV))
       -> pattern_match pt v
-  | ListExp (Cons (pt1, Cons (pt2, Emp))), ListV (ConsV (v, l))
+  | ListExp (Cons ((pt1, _), Cons ((pt2, _), Emp))), ListV (ConsV (v, l))
       -> (pattern_match pt1 v) @ (pattern_match pt2 (ListV l))
   | Wildcard, _ -> []
   | _, _ -> raise MatchError
@@ -101,24 +101,24 @@ and eval_exp env = function
         Environment.Not_bound -> err ("Variable not bound: " ^ x))
   | ILit i -> IntV i
   | BLit b -> BoolV b
-  | BinOp (op, exp1, exp2) -> 
+  | BinOp (op, (exp1, _), (exp2, _)) -> 
       let arg1 = eval_exp env exp1 in
       let arg2 = eval_exp env exp2 in
       apply_prim op arg1 arg2
-  | BinLogicOp (op, exp1, exp2) ->
+  | BinLogicOp (op, (exp1, _), (exp2, _)) ->
       let arg1 = eval_exp env exp1 in
       apply_logic_prim op arg1 exp2 env
-  | IfExp (exp1, exp2, exp3) ->
+  | IfExp ((exp1, _), (exp2, _), (exp3, _)) ->
       let test = eval_exp env exp1 in
         (match test with
             BoolV true -> eval_exp env exp2 
           | BoolV false -> eval_exp env exp3
           | _ -> err ("Test expression must be boolean: if"))
-  | LetExp (l, exp2) ->
+  | LetExp (l, (exp2, _)) ->
       let rec eval_let_list l env' id_l =
         match l with
           [] -> eval_exp env' exp2
-        | (id, exp1) :: rest ->
+        | ((id, _), (exp1, _)) :: rest ->
             if List.exists (fun x -> x = id) id_l then
               err ("one variable is bound several times in this expression")
             else
@@ -127,9 +127,9 @@ and eval_exp env = function
                 eval_let_list rest newenv (id :: id_l)
       in 
         eval_let_list l env []
-  | FunExp (id, exp) -> ProcV (id, exp, ref env)
-  | DFunExp (id, exp) -> DProcV (id, exp)       
-  | AppExp (exp1, exp2) ->
+  | FunExp ((id, _), (exp, _)) -> ProcV (id, exp, ref env)
+  | DFunExp ((id, _), (exp, _)) -> DProcV (id, exp)       
+  | AppExp ((exp1, _), (exp2, _)) ->
       let funval = eval_exp env exp1 in
       let arg = eval_exp env exp2 in
        (match funval with
@@ -140,11 +140,12 @@ and eval_exp env = function
             let newenv = Environment.extend id arg env in
               eval_exp newenv body
         | _ -> err ("Non-function value is applied"))
-  | LetRecExp (l, exp2) ->
+  | LetRecExp (l, (exp2, _)) ->
       let rec eval_letrec_list l env id_l =
         match l with
           [] -> eval_exp !env exp2
-        | (id, para, exp1) :: rest ->
+        | ((id, _), (exp, _)) :: rest ->
+            let FunExp ((para, _), (exp1, _)) = exp in
             if List.exists (fun x -> x = id) id_l then
               err ("one variable is bound several times in this expression")
             else
@@ -158,7 +159,7 @@ and eval_exp env = function
       let rec eval_list lexp =
         match lexp with
           Emp -> EmpV
-        | Cons (exp, rest) -> 
+        | Cons ((exp, _), rest) -> 
             let value = eval_exp env exp in
             ConsV (value, eval_list rest)
       in
@@ -167,13 +168,13 @@ and eval_exp env = function
       (* マッチする対象を評価 *)
       let rec eval_exps = function
           [] -> []
-        | head :: rest -> (eval_exp env head) :: eval_exps rest
+        | (head, _) :: rest -> (eval_exp env head) :: eval_exps rest
       in
         let values = eval_exps exps in
         (* (パターン列) -> (本体式) を順に取り出して処理 *)
         let rec outer_loop = function
             [] -> err ("Not matched")
-          | (patterns, body) :: rest ->
+          | (patterns, (body, _)) :: rest ->
               try
                 let id_and_value_list = inner_loop patterns values in
                 if check_whether_duplication id_and_value_list [] then
@@ -187,7 +188,7 @@ and eval_exp env = function
         and inner_loop pt_l val_l =
           match pt_l, val_l with
             [], [] -> []
-          | (pattern :: pattern_rest), (value :: value_rest)
+          | ((pattern, _) :: pattern_rest), (value :: value_rest)
               -> (pattern_match pattern value)
                  @
                  (inner_loop pattern_rest value_rest)
@@ -211,7 +212,7 @@ and eval_exp env = function
           
 
 let eval_decl env = function
-    Exp e -> let v = eval_exp env e in [("-", env, v)]
+    Exp (e, _) -> let v = eval_exp env e in [("-", env, v)]
   | Decls l ->
       let rec make_decl_list l env =
      (match l with
@@ -221,7 +222,7 @@ let eval_decl env = function
            (match l with
               [] -> env := env';
                     []
-            | (id, e) :: inner_rest ->
+            | ((id, _), (e, _)) :: inner_rest ->
                 if List.exists (fun x -> x = id) id_l then
                   err ("one variable is bound several times in this expression")
                 else 
@@ -241,7 +242,8 @@ let eval_decl env = function
           let rec make_andrecdecl_list l env id_l =
            (match l with
               [] -> []
-            | (id, para, body) :: inner_rest ->
+            | ((id,_), (exp, _)) :: inner_rest ->
+                let FunExp ((para, _), (body, _)) = exp in
                 if List.exists (fun x -> x = id) id_l then
                   err ("one variable is bound several times in this expression")
                 else

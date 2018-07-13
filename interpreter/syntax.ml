@@ -5,47 +5,6 @@ type binOp = Plus | Minus | Mult | Lt | Eq | Cons
 
 type binLogicOp = And | Or
 
-type exp =
-  | Var of id (* Var "x" --> x *)
-  | ILit of int (* ILit 3 --> 3 *)
-  | BLit of bool (* BLit true --> true *)
-  | BinOp of binOp * exp * exp
-  (* BinOp(Plus, ILit 4, Var "x") --> 4 + x *)
-  | BinLogicOp of binLogicOp * exp * exp
-  (* BinLogicOp(And, BLit true, BLit false) --> true && false *)
-  | IfExp of exp * exp * exp
-  (* IfExp(BinOp(Lt, Var "x", ILit 4), 
-           ILit 3, 
-           Var "x") --> 
-     if x<4 then 3 else x *)
-  | LetExp of (id * exp) list * exp
-  (* LetExp([("x", ILit 5); ("y", ILit 3)], 
-            BinOp(Plus, Var "x", Var "y") -->
-     let x = 5 and y = 3 in x + y *)
-  | FunExp of id * exp
-  (* FunExp("x", BinOp(Plus, Var "x", ILit 1)) --> fun x -> x + 1 *)
-  | DFunExp of id * exp
-  (* DFunExp("x", BinOp(Plus, Var "x", ILit 1)) --> dfun x -> x + 1 *)
-  | AppExp of exp * exp
-  (* AppExp(Var "f", ILit 3) --> f 3 *)
-  | LetRecExp of (id * id * exp) list * exp
-  | ListExp of listExp
-  (* ListExp(Cons(ILit 1, (Cons(ILit 2, Emp)))) --> [1;2] *)
-  | MatchExp of exp list * (exp list * exp) list
-  (* MatchExp([ILit 1; ILit 2],
-              [([ILit 0; ILit 1], ILit 0); ([ILit 1; ILit 2], ILit 1)]) -->
-     match 1, 2 with
-       0, 1 -> 0
-     | 1, 2 -> 1 *)
-  | Wildcard (* Wildcard --> _ *)
-and listExp = Emp | Cons of exp * listExp
-
-
-type program = 
-    Exp of exp
-  | Decls of ((id * exp) list) list
-  | RecDecls of ((id * id * exp) list) list
-
 type tyvar = int
 
 type ty =
@@ -55,8 +14,6 @@ type ty =
   | TyFun of ty * ty
   | TyList of ty
 
-type tysc = TyScheme of tyvar list * ty
-
 type attached_tyvar = string
 
 type attached_ty =
@@ -65,6 +22,56 @@ type attached_ty =
   | Tyvar of attached_tyvar
   | Tyfun of attached_ty * attached_ty
   | Tylist of attached_ty
+  | Ranty of attached_ty
+  | TransformedTyvar of tyvar
+
+type typedId = id * attached_ty list
+
+type exp =
+  | Var of id (* Var "x" --> x *)
+  | ILit of int (* ILit 3 --> 3 *)
+  | BLit of bool (* BLit true --> true *)
+  | BinOp of binOp * typedExp * typedExp
+  (* BinOp(Plus, ILit 4, Var "x") --> 4 + x *)
+  | BinLogicOp of binLogicOp * typedExp * typedExp
+  (* BinLogicOp(And, BLit true, BLit false) --> true && false *)
+  | IfExp of typedExp * typedExp * typedExp
+  (* IfExp(BinOp(Lt, Var "x", ILit 4), 
+           ILit 3, 
+           Var "x") --> 
+     if x<4 then 3 else x *)
+  | LetExp of (typedId * typedExp) list * typedExp
+  (* LetExp([("x", ILit 5); ("y", ILit 3)], 
+            BinOp(Plus, Var "x", Var "y") -->
+     let x = 5 and y = 3 in x + y *)
+  | FunExp of typedId * typedExp
+  (* FunExp("x", BinOp(Plus, Var "x", ILit 1)) --> fun x -> x + 1 *)
+  | DFunExp of typedId * typedExp
+  (* DFunExp("x", BinOp(Plus, Var "x", ILit 1)) --> dfun x -> x + 1 *)
+  | AppExp of typedExp * typedExp
+  (* AppExp(Var "f", ILit 3) --> f 3 *)
+  | LetRecExp of (typedId * typedExp) list * typedExp
+  | ListExp of listExp
+  (* ListExp(Cons(ILit 1, (Cons(ILit 2, Emp)))) --> [1;2] *)
+  | MatchExp of typedExp list * (typedExp list * typedExp) list
+  (* MatchExp([ILit 1; ILit 2],
+              [([ILit 0; ILit 1], ILit 0); ([ILit 1; ILit 2], ILit 1)]) -->
+     match 1, 2 with
+       0, 1 -> 0
+     | 1, 2 -> 1 *)
+  | Wildcard (* Wildcard --> _ *)
+and listExp = Emp | Cons of typedExp * listExp
+and typedExp = exp * attached_ty list
+
+
+type program = 
+    Exp of typedExp
+  | Decls of ((typedId * typedExp) list) list
+  | RecDecls of ((typedId * typedExp) list) list
+
+
+type tysc = TyScheme of tyvar list * ty
+
 
 let tysc_of_ty ty = TyScheme ([], ty)
 
@@ -114,7 +121,18 @@ let rec string_of_ty ty =
         | _ -> (body_func ty) ^ " list")
   in
     body_func ty
-  
+
+
+let rec ty_of_attached_ty attached_ty stv_to_itv_list =
+  let rec body_func = function
+      Tyint -> TyInt
+    | Tybool -> TyBool
+    | Tyvar tyvar -> TyVar (List.assoc tyvar stv_to_itv_list)
+    | Tyfun (domty, ranty) -> TyFun ((body_func domty), (body_func ranty))
+    | Tylist ty -> TyList (body_func ty)
+  in
+    body_func attached_ty
+
 
 (* pretty printing *)
 let pp_ty ty = print_string (string_of_ty ty)
@@ -134,7 +152,8 @@ let fresh_tyvar =
   let body () =
     let v = !counter in
       counter := v + 1; v
-  in body        
+  in body    
+  
 
 let rec freevar_ty ty = 
   match ty with
