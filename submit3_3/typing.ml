@@ -287,6 +287,11 @@ let ty_prim op ty1 ty2 = match op with
   | Eq -> ([(ty1, ty2)], TyBool)
   | Cons -> 
      (match ty1, ty2 with
+        (* let a = [];; 
+           val a : a' list = []
+           let b = a :: a;;
+           val b : a' list list = [[]]
+           を実現するためのパターン *)
         TyList (TyVar alpha), TyList (TyVar beta) when alpha = beta -> ([], TyList ty2)
       | _, TyList _
       | _, TyVar _ -> ([(TyList ty1, ty2)], TyList ty1)

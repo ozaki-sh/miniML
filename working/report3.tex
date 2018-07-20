@@ -1,0 +1,148 @@
+\documentclass{jarticle}
+\usepackage[dvipdfmx]{graphicx}
+\usepackage{here}
+\usepackage{listings}
+
+\begin{document}
+
+\title{レポート3(型推論器)}
+\author{1029289895 尾崎翔太}
+\date{2018/7/20}
+
+\maketitle
+\newpage
+
+\section{はじめに}
+ソースコード単位で解説していくのではなく、課題単位で解説していく。
+また、説明は現在のソースコードに合わせたり合わせなかったりしている。
+さらに、最後の方で微妙に時間が余ったので、課題に関係ないものを実装してあるが、あまり気にしないでいただきたい。
+
+\section{各課題の説明}
+\subsection{Exercise 4.2.1}
+\subsubsection{設計方針}
+教科書に載っている部分はそのまま利用した。教科書に載っていないif式とlet式については教科書の説明を読んで、二項演算の部分からの類推も合わせて自然に思いつくような設計にした。
+
+\subsubsection{実装の詳細}
+今のソースコードにこの頃の原型はほとんど残っていないので述べることはない。let多相以前の型推論についてはExercise 4.3.5でまとめて述べる。
+
+\subsection{Exercise 4.3.1}
+\subsubsection{設計方針}
+いろいろ実装した今の状態のものに関して述べる。pp\_ty関数は、pp\_ty関数の中でstringを作るのではなくて、まずtyをstringに変換する関数を作って、そこに受け取った型を渡して、得られたものを表示することにした。なぜなら、関数型などは再帰的な作業を行わないとstring型に変換できず、pp\_tyの中ではするのは大変だと思ったからである。また、型変数については'a,...,'z,'a1,...となるようにしたかったので、表示しようとしている型から型変数を取り出して、表示する際に左に現れるものから順に'a,'b,...と割り当てることにした。当然同じ型変数には同じアルファベットが割り当てられる。freevar\_ty関数は単純にリストでするところをMySetにしただけで実装できた。
+\subsubsection{実装の詳細}
+pp\_ty関数に関する部分はsyntax.mlの99〜155行目である。各関数の意味は関数名とコメントからわかってもらえると思っている。型中に現れる型変数を左から順に0,1,...と対応付けて、それを26で割った時の商と余りを用いて'a,'b,...といったアルファベットを生成する。型変数以外の部分は単純に再帰的にstringに変換している。freevar\_ty関数は167〜174行目にある。特に特筆すべきことはない。
+
+\subsection{Exercise 4.3.2}
+\subsubsection{設計方針}
+subst\_type関数はsubstの中身を順番に型に適用していく部分と、各適用に関して、型の隅々まで適用する部分の二つのループが必要である。そこで、subst\_type関数の内部に、もう一つlet recで定義された関数を用意することにした。
+\subsubsection{実装の詳細}
+typing.mlの10〜20行目にsubst\_type関数がある。単純に再帰的にsubstを適用していくだけで、特筆すべきことはない。
+
+\subsection{Exercise 4.3.3}
+\subsubsection{設計方針}
+教科書に載っているアルゴリズムを素直に実装した。FTVについても、単純にfreevar\_ty関数を用いた。
+\subsubsection{実装の詳細}
+関係している部分はtyping.mlの27〜45行目である。subst\_eqs関数は、eqs中の各型にsubstを適用する関数である。また、リストに関しては、何のリストか、という部分が等しいという制約を新たに追加している。
+
+\subsection{Exercise 4.3.4}
+もし$\alpha \in FTV(\tau)$だったとする。例として$\tau = \alpha \rightarrow \alpha$とする。これは、意味としては$\alpha = \alpha \rightarrow \alpha$という制約が存在するということである。すると、$\tau = (\alpha \rightarrow \alpha) \rightarrow (\alpha \rightarrow \alpha)$となって、さらに$\alpha$に$\alpha \rightarrow \alpha$を代入して、、、となる。つまり、無限に再帰が起こって、$\tau$の型が定まらない。すなわち、エラーということである。よって、$\alpha \not\in FTV(\tau)$が必要となる。
+
+\subsection{Exercise 4.3.5}
+\subsubsection{型推論の手続き}
+\begin{description}
+\item[T-VAR] 
+  \begin{enumerate}
+  \item $\Gamma, x$を入力として型推論を行い、$\O,\tau$を得る。
+　　\item $\O$と$\tau$を出力として返す。
+  \end{enumerate}
+\item[T-INT]
+  \begin{enumerate}
+  \item $\Gamma, n$を入力として型推論を行い、$\O,$intを得る。
+　　\item $\O$とintを出力として返す。
+  \end{enumerate}
+\item[T-BOOL]
+  \begin{enumerate}
+  \item $\Gamma, n$を入力として型推論を行い、$\O,$boolを得る。
+　　\item $\O$とboolを出力として返す。
+  \end{enumerate}
+\item[T-MULT]
+  \begin{enumerate}
+  \item $\Gamma,e_{1}$を入力として型推論を行い、$\mathcal{S}_{1},\tau_{1}$を得る。
+　　\item $\Gamma,e_{2}$を入力として型推論を行い、$\mathcal{S}_{2},\tau_{2}$を得る。
+　　\item 型代入$\mathcal{S}_{1},\mathcal{S}_{2}$を$\alpha=\tau$という形の方程式の集まりとみなして、$\mathcal{S}_{1} \cup \mathcal{S}_{2} \cup \{(\tau_{1},$int$),(\tau_{2},$int$)\}$を単一化し、型代入$\mathcal{S}_{3}$を得る。
+  \item $\mathcal{S}_{3}$とintを出力として返す。
+  \end{enumerate}
+\item[T-LT]
+  \begin{enumerate}
+  \item $\Gamma,e_{1}$を入力として型推論を行い、$\mathcal{S}_{1},\tau_{1}$を得る。
+　　\item $\Gamma,e_{2}$を入力として型推論を行い、$\mathcal{S}_{2},\tau_{2}$を得る。
+　　\item 型代入$\mathcal{S}_{1},\mathcal{S}_{2}$を$\alpha=\tau$という形の方程式の集まりとみなして、$\mathcal{S}_{1} \cup \mathcal{S}_{2} \cup \{(\tau_{1},$int$),(\tau_{2},$int$)\}$を単一化し、型代入$\mathcal{S}_{3}$を得る。
+  \item $\mathcal{S}_{3}$とboolを出力として返す。
+  \end{enumerate}
+\item[T-IF]
+  \begin{enumerate}
+  \item $\Gamma,e_{1}$を入力として型推論を行い、$\mathcal{S}_{1},\tau_{1}$を得る。
+　　\item $\Gamma,e_{2}$を入力として型推論を行い、$\mathcal{S}_{2},\tau_{2}$を得る。
+  \item $\Gamma,e_{3}$を入力として型推論を行い、$\mathcal{S}_{3},\tau_{3}$を得る。
+　　\item 型代入$\mathcal{S}_{1},\mathcal{S}_{2},\mathcal{S}_{3}$を$\alpha=\tau$という形の方程式の集まりとみなして、$\mathcal{S}_{1} \cup \mathcal{S}_{2} \cup \mathcal{S}_{3} \cup \{(\tau_{1},$bool$),(\tau_{2},\tau_{3})\}$を単一化し、型代入$\mathcal{S}_{4}$を得る。
+  \item $\mathcal{S}_{4}$と$\mathcal{S}_{4}(\tau_{2})(=\mathcal{S}_{4}(\tau_{3}))$を出力として返す。
+  \end{enumerate}
+\item[T-LET]
+  \begin{enumerate}
+  \item $\Gamma,e_{1}$を入力として型推論を行い、$\mathcal{S}_{1},\tau_{1}$を得る。
+　　\item $\Gamma,x : \tau_{1},e_{2}$を入力として型推論を行い、$\mathcal{S}_{2},\tau_{2}$を得る。
+　　\item 型代入$\mathcal{S}_{1},\mathcal{S}_{2}$を$\alpha=\tau$という形の方程式の集まりとみなして、$\mathcal{S}_{1} \cup \mathcal{S}_{2}$を単一化し、型代入$\mathcal{S}_{3}$を得る。
+  \item $\mathcal{S}_{3}$と$\mathcal{S}_{3}(\tau_{2})$を出力として返す。
+  \end{enumerate}
+\item[T-FUN]
+  \begin{enumerate}
+  \item $\Gamma,x : \tau_{1},e$を入力として型推論を行い、$\mathcal{S},\tau_{2}$を得る。
+  \item $\mathcal{S}$と$\mathcal{S}(\tau_{1} \rightarrow \tau_{2})$を出力として返す。
+  \end{enumerate}
+\item[T-APP]
+  \begin{enumerate}
+  \item $\Gamma,e_{1}$を入力として型推論を行い、$\mathcal{S}_{1},\tau_{1}$を得る。
+  \item $\Gamma,e_{2}$を入力として型推論を行い、$\mathcal{S}_{2},\tau_{2}$を得る。
+  \item 型代入$\mathcal{S}_{1},\mathcal{S}_{2}$を$\alpha=\tau$という形の方程式の集まりとみなして、$\mathcal{S}_{1} \cup \mathcal{S}_{2} \cup \{(\tau_{1},\tau_{2} \rightarrow \tau_{3})\}$を単一化し、型代入$\mathcal{S}_{3}$を得る。
+  \item $\mathcal{S}_{3}$と$\mathcal{S}_{3}(\tau_{3})$を出力として返す。
+  \end{enumerate}
+\end{description}
+\subsubsection{設計方針}
+上記したアルゴリズムに従って実装した。
+\subsubsection{実装の詳細}
+教科書の図4.4に倣って実装した。IfExpは単純に実装できたが、LetExpは課題2でいろいろと拡張していたので少し面倒だったが、evalと同じように処理することにした。AppExpは$e_{1}$の型が関数型なら単に定義域の型と$e_{2}$の型が等しいという制約を加えて値域の型を返すだけで良かったが、型変数なら、新たに型変数を二つ作ってそれぞれ定義域と値域として、$e_{1}$の型に関する制約も付け加えなければならなかった。他の部分は教科書そのままである。
+
+\subsection{Exercise 4.3.6}
+\subsubsection{設計方針}
+バックパッチではなく、単に正しい値の束縛を追加することでダミーの束縛を隠すことにした。
+\subsubsection{実装の詳細}
+関係する部分はtyping.mlの394〜435行目である。let rec式も課題2の拡張のせいで少し複雑になっている。まず、適当に関数型を作って変数がそれに束縛されているようにする。その状態で本当に束縛すべき値を評価して等式集合を得る。次にそれを単一化して、環境からダミーを取り出して型代入を適用して、再度環境に追加する。そして、その環境下で最後の式を評価する。気をつけるべきことは、$e_{1}$の型を得るときに$x$をdomtyで拡張することと、$e_{1}$の型とrantyの型が等しいという制約を追加することである。
+
+\subsection{Exercise 4.3.7}
+\subsubsection{設計方針}
+基本的にはevalの時と同じような流れで行う。大きく違うのはパターンマッチの部分で、evalの時は束縛のリストを返すだけで良かったが、今回はそれに加えて、型変数に関する情報として型代入の集合も返すようになっている。こうすることで、各パターン列が異なる型を持っていた場合に型エラーを検出できる。
+\subsubsection{実装の詳細}
+主にmatch式について述べる。関係する部分はtyping.mlの114〜154、452〜509行目である。match式も課題2の拡張のせいでとても複雑になっている。しかし、設計方針で述べたように基本的にはevalと同じである。ただ、単一化すべき等式集合が多くてややこしくなっている。詳細はプログラムのコメントを見ていただきたい。
+
+\subsection{Exercise 4.4.1}
+\subsubsection{設計方針}
+図4.5,4.6に載っている部分はそのまま実装した。let式、宣言は、環境を拡張する部分が型から型スキームに変えることで実装した。
+\subsubsection{実装の詳細}
+最初は単純に環境を型ではなく型スキームで拡張するようにしたのだが、これだとこの課題のテストは通ったが、前の課題のテストが通らなくなっていた。要するに型スキームにすべき範囲が広すぎたのだ。結果として、closure関数の第三引数を利用して環境に型代入を適用することで解決した。他の部分については特に述べることはない。
+
+\subsection{Exercise 4.4.2}
+\subsubsection{設計方針}
+let式、宣言と同じである。
+\subsubsection{実装の詳細}
+変更点はlet式、宣言と同じなので特筆すべきことはない。
+
+\subsection{Exercise 4.4.3}
+\subsubsection{設計方針}
+まず、idやexpと型の組を新たな型として定義する。そして、それが評価されて、型代入と型を返す前に、その付与された型との整合性もチェックするようにする。また、型注釈に型変数が使用されている場合は、その型変数はstring型で表現されているので通常の型を表す型とは別の型を用意する必要がある。
+\subsubsection{実装の詳細}
+まず、syntax.mlに新たにattached\_tyやtypedIdやtypedExpといった型を追加する。意味は名前の通りである。そして、expの各コンストラクタにぶらさがっているidとexpをtypedIdとtypedExpに変更する。attached\_tyのRantyは、let f x : int = xのような場合のintはfの型そのものではなく、fの値域の型であるから、それを表したものである。TransformedTyvarは中間表現で、TyvarをTyVarに変換するためのものである。次に、lexer.mllに：や型名に関するルールを追加する。型変数の場合は'(アルファベット)(アルファベット or 数字 or　アンダースコア)*である。次にparser.mlyも大きく変更された。まず、IDtという非終端記号を追加した。これは、単なるIDか型注釈付きのIDのどちらかを表す。nonempty\_listを適用するために一つの非終端記号にまとめる必要があったのである。expについては、基本的にAExprで型注釈を追加するようにした。それ以外では単純にexpを返していたところを(exp, [])を返すようにした。最後に、typing.mlもかなり変更された。まず、与えられた式、宣言中のTyvarをTransformedTyvarにする必要がある。そのためにget\_attached\_ty\_list関数で式中の型注釈を全て集めて、get\_attached\_tyvar\_list関数を用いながらmake\_Tyvar\_to\_TyVar\_list関数でTyvarとTyVarの対応表を作る。その対応表の実体は、stringとintの組である。
+その対応表を用いてtransform関数で式中のTyvarをTransformedTyvarに変換する。その後、式を評価していき、今まで返していた型代入$\mathcal{S}$と型$\tau$を求めたあとに、make\_eqs\_about\_att\_ty関数で、型注釈に関する等式集合を得て、それも含めて新たに単一化をして型代入$\mathcal{S}'$を得て、$\mathcal{S}'$と$\mathcal{S}'(\tau)$を返す。また、make\_eqs\_about\_att\_ty関数には、attached\_tyをtyに変換するty\_of\_attached\_ty関数を用いている。最後に、ocamlに合わせるために、LetRecExpはidとFunExpを引数に取るようにした。
+
+\section{感想}
+全体的に楽しかった。ただ、やっぱり選択課題をすべてやるには時間が足りなさすぎると思った。また、テストケースがなぜ通らないのかがわからない時が辛かった。型推論は、アルゴリズムが教科書に載っているのでそこまで難しくはなかった。実験4のコンパイラもやろうかなと思った。
+
+\end{document}
