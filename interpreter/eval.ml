@@ -1,4 +1,4 @@
-open Syntax 
+open Syntax
 
 (* 値の定義 *)
 
@@ -65,7 +65,8 @@ let rec pattern_match pattern value =
   | _, _ -> raise MatchError
 
 
-let rec apply_prim op arg1 arg2 = match op, arg1, arg2 with
+let rec apply_prim op arg1 arg2 =
+  match op, arg1, arg2 with
     Plus, IntV i1, IntV i2 -> IntV (i1 + i2)
   | Minus, IntV i1, IntV i2 -> IntV (i1 - i2)
   | Mult, IntV i1, IntV i2 -> IntV (i1 * i2)
@@ -76,33 +77,37 @@ let rec apply_prim op arg1 arg2 = match op, arg1, arg2 with
   | Eq, StringV s1, StringV s2 -> BoolV (s1 = s2)
   | Cons, _, ListV l -> ListV (ConsV (arg1, l))
   | Hat, StringV s1, StringV s2 -> StringV (s1 ^ s2)
-  | Expo, IntV i1, IntV i2 -> 
+  | Expo, IntV i1, IntV i2 ->
       if i2 < 0 then err ("right argument must be non-negative : **")
       else IntV (int_of_float ((float_of_int i1) ** (float_of_int i2)))
+  | _ -> err ("For debug : this error cannot occur")
 
 
 let rec apply_logic_prim op arg1 exp2 env = match op, arg1 with
     And, BoolV b1 ->
       if b1 then
         let arg2 = eval_exp env exp2 in
-       (match arg2 with
-          BoolV _ -> arg2)
+        (match arg2 with
+           BoolV _ -> arg2
+         | _ -> err "For debug : this error cannot occur")
       else BoolV false
   | Or, BoolV b1 ->
       if b1 then BoolV true
       else
         let arg2 = eval_exp env exp2 in
-       (match arg2 with
-          BoolV _ -> arg2)
+        (match arg2 with
+           BoolV _ -> arg2
+         | _ -> err "For debug : this error cannot occur")
+  | _ -> err ("For debug : this error cannot occur")
 
 and eval_exp env = function
-    Var x -> 
-      (try Environment.lookup x env with 
+    Var x ->
+      (try Environment.lookup x env with
         Environment.Not_bound -> err ("Variable not bound: " ^ x))
   | ILit i -> IntV i
   | BLit b -> BoolV b
   | SLit s -> StringV s
-  | BinOp (op, (exp1, _), (exp2, _)) -> 
+  | BinOp (op, (exp1, _), (exp2, _)) ->
       let arg1 = eval_exp env exp1 in
       let arg2 = eval_exp env exp2 in
       apply_prim op arg1 arg2
@@ -112,8 +117,9 @@ and eval_exp env = function
   | IfExp ((exp1, _), (exp2, _), (exp3, _)) ->
       let test = eval_exp env exp1 in
         (match test with
-            BoolV true -> eval_exp env exp2 
-          | BoolV false -> eval_exp env exp3)
+            BoolV true -> eval_exp env exp2
+          | BoolV false -> eval_exp env exp3
+          | _ -> err ("For debug : this error cannot occur"))
   | LetExp (l, (exp2, _)) ->
       let rec eval_let_list l env' =
         match l with
@@ -122,76 +128,78 @@ and eval_exp env = function
             let value = eval_exp env exp1 in
             let newenv = Environment.extend id value env' in
               eval_let_list rest newenv
-      in 
-        eval_let_list l env 
+      in
+      eval_let_list l env
   | FunExp ((id, _), (exp, _)) -> ProcV (id, exp, ref env)
-  | DFunExp ((id, _), (exp, _)) -> DProcV (id, exp)       
+  | DFunExp ((id, _), (exp, _)) -> DProcV (id, exp)
   | AppExp ((exp1, _), (exp2, _)) ->
       let funval = eval_exp env exp1 in
       let arg = eval_exp env exp2 in
        (match funval with
           ProcV (id, body, env') ->
             let newenv = Environment.extend id arg !env' in
-              eval_exp newenv body
+            eval_exp newenv body
         | DProcV (id, body) ->
             let newenv = Environment.extend id arg env in
-              eval_exp newenv body)
+            eval_exp newenv body
+        | _ -> err ("For debug : this error cannot occur"))
   | LetRecExp (l, (exp2, _)) ->
       let rec eval_letrec_list l env =
         match l with
           [] -> eval_exp !env exp2
-        | ((id, _), (exp, _)) :: rest ->
-            let FunExp ((para, _), (exp1, _)) = exp in
+        | ((id, _), ((FunExp ((para, _), (exp1, _))), _)) :: rest ->
             let value = ProcV (para, exp1, env) in
             let newenv = Environment.extend id value !env in
-                env := newenv;
-                eval_letrec_list rest env
+            env := newenv;
+            eval_letrec_list rest env
+        | _ -> err ("For debug : this error cannot occur")
       in
-        eval_letrec_list l (ref env)
+      eval_letrec_list l (ref env)
   | ListExp lexp ->
       let rec eval_list lexp =
         match lexp with
           Emp -> EmpV
-        | Cons ((exp, _), rest) -> 
+        | Cons ((exp, _), rest) ->
             let value = eval_exp env exp in
             ConsV (value, eval_list rest)
       in
-        ListV (eval_list lexp)
+      ListV (eval_list lexp)
   | MatchExp (exps, pattern_and_body_list) ->
       (* マッチする対象を評価 *)
       let rec eval_exps = function
           [] -> []
         | (head, _) :: rest -> (eval_exp env head) :: eval_exps rest
       in
-        let values = eval_exps exps in
-        (* (パターン列) -> (本体式) を順に取り出して処理 *)
-        let rec outer_loop = function
-            [] -> err ("Not matched")
-          | (patterns, (body, _)) :: rest ->
-              try
-                let id_and_value_list = inner_loop patterns values in
-                let newenv = bind_and_return_env env id_and_value_list in
-                eval_exp newenv body
-              with
-                MatchError -> outer_loop rest
-        (* パターン列を順にマッチさせていく *)
-        and inner_loop pt_l val_l =
-          match pt_l, val_l with
-            [], [] -> []
-          | ((pattern, _) :: pattern_rest), (value :: value_rest)
-              -> (pattern_match pattern value)
-                 @
-                 (inner_loop pattern_rest value_rest)
-          | _, _ -> err ("The number of patterns must be same as the number of expression")
-        (* パターンマッチの結果束縛する必要がある変数を束縛した環境を返す *)
-        and bind_and_return_env env = function
-            [] -> env
-          | (id, value) :: rest ->
-              let newenv = Environment.extend id value env in
-              bind_and_return_env newenv rest 
-        in
-          outer_loop pattern_and_body_list
-          
+      let values = eval_exps exps in
+      (* (パターン列) -> (本体式) を順に取り出して処理 *)
+      let rec outer_loop = function
+          [] -> err ("Not matched")
+        | (patterns, (body, _)) :: rest ->
+           try
+             let id_and_value_list = inner_loop patterns values in
+             let newenv = bind_and_return_env env id_and_value_list in
+             eval_exp newenv body
+           with
+             MatchError -> outer_loop rest
+      (* パターン列を順にマッチさせていく *)
+      and inner_loop pt_l val_l =
+        match pt_l, val_l with
+          [], [] -> []
+        | ((pattern, _) :: pattern_rest), (value :: value_rest)
+          -> (pattern_match pattern value)
+             @
+               (inner_loop pattern_rest value_rest)
+        | _, _ -> err ("The number of patterns must be same as the number of expression")
+      (* パターンマッチの結果束縛する必要がある変数を束縛した環境を返す *)
+      and bind_and_return_env env = function
+          [] -> env
+        | (id, value) :: rest ->
+           let newenv = Environment.extend id value env in
+           bind_and_return_env newenv rest
+      in
+      outer_loop pattern_and_body_list
+  | _ -> err ("not implemented yet")
+
 
 let eval_decl env = function
     Exp (e, _) -> let v = eval_exp env e in [("-", env, v)]
@@ -199,7 +207,7 @@ let eval_decl env = function
       let rec make_decl_list l env =
      (match l with
         [] -> []
-      | head :: outer_rest -> 
+      | head :: outer_rest ->
           let rec make_anddecl_list l env' =
            (match l with
               [] -> env := env';
@@ -207,30 +215,30 @@ let eval_decl env = function
             | ((id, _), (e, _)) :: inner_rest ->
                 let v = eval_exp !env e in
                 let newenv = Environment.extend id v env' in
-                  (id, newenv, v) :: make_anddecl_list inner_rest newenv)
+                (id, newenv, v) :: make_anddecl_list inner_rest newenv)
            in
-             let and_list = make_anddecl_list head !env in
-               and_list @ make_decl_list outer_rest env)
+           let and_list = make_anddecl_list head !env in
+           and_list @ make_decl_list outer_rest env)
       in
-        make_decl_list l (ref env)
+      make_decl_list l (ref env)
   | RecDecls l ->
-      let rec make_recdecl_list l env =
-     (match l with
-        [] -> []
-      | head :: outer_rest ->
-          let rec make_andrecdecl_list l env =
-           (match l with
-              [] -> []
-            | ((id,_), (exp, _)) :: inner_rest ->
-                let FunExp ((para, _), (body, _)) = exp in
-                let v = ProcV (para, body, env) in
-                let newenv = Environment.extend id v !env in
-                  env := newenv;
-                  (id, newenv, v) :: make_andrecdecl_list inner_rest env )
-          in
-            let and_list = make_andrecdecl_list head env in
-              and_list @ make_recdecl_list outer_rest env)
-      in
-        make_recdecl_list l (ref env)
-                  
+     let rec make_recdecl_list l env =
+       (match l with
+          [] -> []
+        | head :: outer_rest ->
+           let rec make_andrecdecl_list l env =
+             (match l with
+                [] -> []
+              | ((id,_), ((FunExp ((para, _), (body, _))), _)) :: inner_rest ->
+                 let v = ProcV (para, body, env) in
+                 let newenv = Environment.extend id v !env in
+                 env := newenv;
+                 (id, newenv, v) :: make_andrecdecl_list inner_rest env
+              | _ -> err ("For debug : this error cannot occur"))
+           in
+           let and_list = make_andrecdecl_list head env in
+           and_list @ make_recdecl_list outer_rest env)
+     in
+     make_recdecl_list l (ref env)
+
 

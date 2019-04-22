@@ -43,12 +43,12 @@ type exp =
   | BinLogicOp of binLogicOp * typedExp * typedExp
   (* BinLogicOp(And, BLit true, BLit false) --> true && false *)
   | IfExp of typedExp * typedExp * typedExp
-  (* IfExp(BinOp(Lt, Var "x", ILit 4), 
-           ILit 3, 
-           Var "x") --> 
+  (* IfExp(BinOp(Lt, Var "x", ILit 4),
+           ILit 3,
+           Var "x") -->
      if x<4 then 3 else x *)
   | LetExp of (typedId * typedExp) list * typedExp
-  (* LetExp([("x", ILit 5); ("y", ILit 3)], 
+  (* LetExp([("x", ILit 5); ("y", ILit 3)],
             BinOp(Plus, Var "x", Var "y") -->
      let x = 5 and y = 3 in x + y *)
   | FunExp of typedId * typedExp
@@ -72,7 +72,7 @@ and listExp = Emp | Cons of typedExp * listExp
 and typedExp = exp * attached_ty list
 
 
-type program = 
+type program =
     Exp of typedExp
   | Decls of ((typedId * typedExp) list) list
   | RecDecls of ((typedId * typedExp) list) list
@@ -92,12 +92,13 @@ let rec ty_of_attached_ty attached_ty stv_to_itv_list =
     | Tyvar tyvar -> TyVar (List.assoc tyvar stv_to_itv_list)
     | Tyfun (domty, ranty) -> TyFun ((body_func domty), (body_func ranty))
     | Tylist ty -> TyList (body_func ty)
+    | _ -> TyInt (* this line cannot be done *)
   in
-    body_func attached_ty
+  body_func attached_ty
 
 
 (* 0-25をa-zに変換する *)
-let alphabet_of_0to25 i = 
+let alphabet_of_0to25 i =
   if i >= 0 && i <= 25 then Char.escaped (char_of_int (i + 97))
   else "error" (* この文は実行されないはず(呼び出し側が気をつける) *)
 
@@ -116,20 +117,18 @@ let make_tyvar_string_list ty =
     let num = !counter in
     match ty with
       TyInt
-    | TyBool 
+    | TyBool
     | TyString -> ts_list
     | TyVar tyvar ->
-        if List.mem_assoc tyvar ts_list then ts_list
-        else (counter := num + 1; (tyvar, string_of_num num) :: ts_list)
+       if List.mem_assoc tyvar ts_list then ts_list
+       else (counter := num + 1; (tyvar, string_of_num num) :: ts_list)
     | TyFun (domty, ranty) ->
-        let domty_ts_list = body_func domty ts_list in
-        let ranty_ts_list = body_func ranty domty_ts_list in
-        domty_ts_list @ ranty_ts_list
+       let domty_ts_list = body_func domty ts_list in
+       let ranty_ts_list = body_func ranty domty_ts_list in
+       domty_ts_list @ ranty_ts_list
     | TyList ty' -> body_func ty' ts_list
   in
-    body_func ty []
-         
-
+  body_func ty []
 
 let rec string_of_ty ty =
   let tyvar_string_list = make_tyvar_string_list ty in (* これを持ちまわるのが面倒だったのでbody_funcを作った *)
@@ -140,14 +139,14 @@ let rec string_of_ty ty =
     | TyString -> "string"
     | TyVar tyvar -> List.assoc tyvar tyvar_string_list
     | TyFun (TyFun (_, _) as domty, ranty) -> "(" ^ (body_func domty) ^ ")" ^
-                                              " -> " ^ (body_func ranty)
+                                                " -> " ^ (body_func ranty)
     | TyFun (domty, ranty) -> (body_func domty) ^ " -> " ^ (body_func ranty)
-    | TyList ty -> 
+    | TyList ty ->
        (match ty with
           TyFun (_, _) -> "(" ^ (body_func ty) ^ ")" ^ " list"
         | _ -> (body_func ty) ^ " list")
   in
-    body_func ty
+  body_func ty
 
 
 
@@ -160,14 +159,14 @@ let fresh_tyvar =
   let counter = ref 0 in
   let body () =
     let v = !counter in
-      counter := v + 1; v
-  in body    
-  
+    counter := v + 1; v
+  in body
 
-let rec freevar_ty ty = 
+
+let rec freevar_ty ty =
   match ty with
     TyInt
-  | TyBool 
+  | TyBool
   | TyString -> MySet.empty
   | TyVar tyvar -> MySet.singleton tyvar
   | TyFun (domty, ranty) -> MySet.union (freevar_ty domty) (freevar_ty ranty)

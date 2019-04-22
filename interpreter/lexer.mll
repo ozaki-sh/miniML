@@ -14,11 +14,12 @@ let reservedWords = [
   ("list", Parser.LIST);
   ("match", Parser.MATCH);
   ("rec", Parser.REC);
+  ("ref", Parser.REF);
   ("string", Parser.STRING);
   ("then", Parser.THEN);
   ("true", Parser.TRUE);
   ("with", Parser.WITH);
-] 
+]
 }
 
 rule main = parse
@@ -41,8 +42,8 @@ rule main = parse
 | "->" { Parser.RARROW }
 | "&&" { Parser.AND }
 | "||" { Parser.OR }
-| "[" { Parser.LSTLPRN }
-| "]" { Parser.LSTRPRN }
+| "[" { Parser.LBOXBRA }
+| "]" { Parser.RBOXBRA }
 | "::" { Parser.CONS }
 | "|" { Parser.BAR }
 | ";" { Parser.SEMI }
@@ -52,17 +53,22 @@ rule main = parse
 | "^" { Parser.HAT }
 | ">" { Parser.MT }
 | "**" { Parser.EXPO }
+| "!" { Parser.EXCLM }
+| ":=" { Parser.COLONEQ }
+| "{" { Parser.LCLYBRA }
+| "}" { Parser.RCLYBRA }
+| "." { Parser.DOT }
 
 | ['a'-'z'] ['a'-'z' '0'-'9' '_' '\'']*
     { let id = Lexing.lexeme lexbuf in
-      try 
+      try
         List.assoc id reservedWords
       with
       _ -> Parser.ID id
      }
 
 | ['"'] ['!' '#'-'~' ]* ['"']
-    { let str = Lexing.lexeme lexbuf in 
+    { let str = Lexing.lexeme lexbuf in
       let len = String.length str in
       Parser.STRINGV (String.sub str 1 (len - 2)) }
 
@@ -73,9 +79,9 @@ rule main = parse
 
 and comment i = parse
   "(*" { comment (i+1) lexbuf }
-| "*)" 
+| "*)"
     { if i = 0 then main lexbuf
-      else comment (i-1) lexbuf 
+      else comment (i-1) lexbuf
     }
 | _ { comment i lexbuf }
 

@@ -10,10 +10,13 @@ open Syntax
 %token RARROW FUN DFUN
 %token REC
 %token MATCH WITH BAR
-%token LSTLPRN LSTRPRN CONS SEMI
+%token LBOXBRA RBOXBRA CONS SEMI
 %token COMMA UNDERSCORE
 %token COLON
 %token INT BOOL STRING LIST
+%token LCLYBRA RCLYBRA DOT
+%token REF COLONEQ EXCLM
+%token TYPE
 
 %token <int> INTV
 %token <Syntax.id> ID
@@ -48,7 +51,7 @@ LetRecAndDecl :
   | f=IDt EQ e=FunExpr { [(f, e)] }
   | f=ID fe=LetFunExpr LETAND d=LetRecAndDecl { let (e, ty) = fe in ((f, ty), e) :: d }
   | f=ID fe=LetFunExpr { let (e, ty) = fe in [((f, ty), e)] }
-    
+
 
 Expr :
     e=IfExpr { e }
@@ -77,7 +80,7 @@ AndExpr :
   | l=AndExpr AND r=LookRightExpr { (BinLogicOp(And, l, r), []) }
   | e=CmpExpr { e }
 
-CmpExpr : 
+CmpExpr :
     l=PMExpr LT r=PMExpr { (BinOp (Lt, l, r), []) }
   | l=PMExpr LT r=LookRightExpr { (BinOp (Lt, l, r), []) }
   | l=PMExpr MT r=PMExpr { (BinOp (Mt, l, r), []) }
@@ -102,7 +105,7 @@ PMExpr :
   | l=PMExpr MINUS r=LookRightExpr { (BinOp (Minus, l, r), []) }
   | e=MExpr { e }
 
-MExpr : 
+MExpr :
     l=MExpr MULT r=EExpr { (BinOp (Mult, l, r), []) }
   | l=MExpr MULT r=LookRightExpr { (BinOp (Mult, l, r), []) }
   | e=EExpr { e }
@@ -124,7 +127,7 @@ FunInfixExpr :
   | LPAREN EQ RPAREN { (FunExp (("x", []), (FunExp (("y", []), ((BinOp (Eq, (Var "x", []), (Var "y", []))), [])), [])), []) }
   | LPAREN AND RPAREN { (FunExp (("x", []), (FunExp (("y", []), ((BinLogicOp (And, (Var "x", []), (Var "y", []))), [])), [])), []) }
   | LPAREN OR RPAREN { (FunExp (("x", []), (FunExp (("y", []), ((BinLogicOp (Or, (Var "x", []), (Var "y", []))), [])), [])), []) }
-  | LPAREN HAT RPAREN { (FunExp (("x", []), (FunExp (("y", []), ((BinOp (Hat, (Var "x", []), (Var "y", []))), [])), [])), []) } 
+  | LPAREN HAT RPAREN { (FunExp (("x", []), (FunExp (("y", []), ((BinOp (Hat, (Var "x", []), (Var "y", []))), [])), [])), []) }
   | e=AExpr { e }
 
 AExpr :
@@ -133,28 +136,28 @@ AExpr :
   | FALSE  { (BLit false, []) }
   | s=STRINGV { (SLit s, []) }
   | i=ID   { (Var i, []) }
-  | LSTLPRN LSTRPRN  { (ListExp Emp, []) }
-  | e=ListHeadExpr { (ListExp e, []) } 
+  | LBOXBRA RBOXBRA  { (ListExp Emp, []) }
+  | e=ListHeadExpr { (ListExp e, []) }
   | LPAREN e=Expr RPAREN { e }
   | LPAREN e=Expr COLON ty=FunType RPAREN { let (e', l) = e in (e', ty :: l) }
 
 ListHeadExpr :
-    LSTLPRN e=Expr lst=ListTailExpr { Cons (e, lst) }
+    LBOXBRA e=Expr lst=ListTailExpr { Cons (e, lst) }
 
 ListTailExpr :
     SEMI e=Expr lst=ListTailExpr { Cons (e, lst) }
-  | LSTRPRN { Emp }
+  | RBOXBRA { Emp }
 
 IfExpr :
-    IF c=Expr THEN t=Expr ELSE e=Expr { (IfExp (c, t, e), []) } 
+    IF c=Expr THEN t=Expr ELSE e=Expr { (IfExp (c, t, e), []) }
 
 LetExpr :
     LET le=LetAndExpr { let (l, e) = le in (LetExp (l, e), []) }
-    
+
 LetAndExpr :
-    x=IDt EQ e1=Expr LETAND le=LetAndExpr { let (l, e2) = le in ((x, e1) :: l, e2) } 
+    x=IDt EQ e1=Expr LETAND le=LetAndExpr { let (l, e2) = le in ((x, e1) :: l, e2) }
   | x=IDt EQ e1=Expr IN e2=Expr { ([(x, e1)], e2) }
-  | f=ID et=LetFunExpr LETAND le=LetAndExpr { let (e1, ty) = et in let (l, e2) = le in (((f, ty), e1) :: l, e2) } 
+  | f=ID et=LetFunExpr LETAND le=LetAndExpr { let (e1, ty) = et in let (l, e2) = le in (((f, ty), e1) :: l, e2) }
   | f=ID et=LetFunExpr IN e2=Expr { let (e1, ty) = et in ([((f, ty), e1)], e2) }
 
 LetFunExpr :
@@ -188,19 +191,19 @@ LetRecExpr :
     LET REC le=LetRecAndExpr { let (l, e) = le in (LetRecExp (l, e), []) }
 
 LetRecAndExpr :
-    f=IDt EQ e1=FunExpr LETAND le=LetRecAndExpr { let (l, e2) = le in ((f, e1) :: l, e2) } 
+    f=IDt EQ e1=FunExpr LETAND le=LetRecAndExpr { let (l, e2) = le in ((f, e1) :: l, e2) }
   | f=IDt EQ e1=FunExpr IN e2=Expr { ([(f, e1)], e2) }
-  | f=ID fe=LetFunExpr LETAND le=LetRecAndExpr { let (e1, ty) = fe in let (l, e2) = le in (((f, ty), e1) :: l, e2) } 
+  | f=ID fe=LetFunExpr LETAND le=LetRecAndExpr { let (e1, ty) = fe in let (l, e2) = le in (((f, ty), e1) :: l, e2) }
   | f=ID fe=LetFunExpr IN e2=Expr { let (e1, ty) = fe in ([((f, ty), e1)], e2) }
 
 MatchExpr :
     MATCH e1=Expr e2=list(MoreExpr) WITH option(BAR) e3=PatternMatchExpr { (MatchExp (e1 :: e2, e3), []) }
- 
+
 MoreExpr :
     COMMA e=Expr { e }
 
 Pattern :
-    LSTLPRN pt=Pattern LSTRPRN { (ListExp (Cons (pt, Emp)), []) }
+    LBOXBRA pt=Pattern RBOXBRA { (ListExp (Cons (pt, Emp)), []) }
   | pt1=Pattern CONS pt2=Pattern { (ListExp (Cons (pt1, Cons (pt2, Emp))), []) }
   | pt=APattern { pt }
 
@@ -210,13 +213,13 @@ APattern :
   | FALSE  { (BLit false, []) }
   | s=STRINGV { (SLit s, []) }
   | x=ID { (Var x, []) }
-  | LSTLPRN LSTRPRN { (ListExp Emp, []) }
+  | LBOXBRA RBOXBRA { (ListExp Emp, []) }
   | UNDERSCORE { (Wildcard, []) }
   | LPAREN pt=Pattern RPAREN { pt }
   | LPAREN pt=Pattern COLON ty=FunType RPAREN { let (pt', l) = pt in (pt', ty :: l) }
 
 PatternMatchExpr :
-    pt=Patterns pts=list(MorePatterns) RARROW e1=Expr e2=list(MorePatternMatchExpr) { 
+    pt=Patterns pts=list(MorePatterns) RARROW e1=Expr e2=list(MorePatternMatchExpr) {
       let pattern_and_body_list = List.concat e2 in
       let rec link_pattern_with_body_andthen_cons = function
           [] -> (pt, e1) :: pattern_and_body_list
@@ -225,7 +228,7 @@ PatternMatchExpr :
         link_pattern_with_body_andthen_cons pts }
 
 MorePatternMatchExpr :
-    BAR pt=Patterns pts=list(MorePatterns) RARROW e=Expr { 
+    BAR pt=Patterns pts=list(MorePatterns) RARROW e=Expr {
       let rec link_pattern_with_body = function
           [] -> [(pt, e)]
         | head :: rest -> (head, e) :: link_pattern_with_body rest
@@ -258,7 +261,7 @@ WithType :
 
 IDt :
     x=ID { (x, []) }
-  | LPAREN x=IDt COLON ty=FunType RPAREN { let (x', l) = x in (x', ty :: l) }  
+  | LPAREN x=IDt COLON ty=FunType RPAREN { let (x', l) = x in (x', ty :: l) }
 
 
 
