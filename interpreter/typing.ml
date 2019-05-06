@@ -128,6 +128,9 @@ let rec get_attached_ty_list (exp, att_ty) =
     and from_listExp = function
         Emp -> []
       | Cons (exp, l) -> (get_attached_ty_list exp) @ from_listExp l
+    and from_tupleExp = function
+        EmpT -> []
+      | ConsT (exp, l) -> (get_attached_ty_list exp) @ from_tupleExp l
     and from_exp_list = function
         [] -> []
       | exp :: rest -> (get_attached_ty_list exp) @ from_exp_list rest
@@ -149,7 +152,8 @@ let rec get_attached_ty_list (exp, att_ty) =
     | AppExp (exp1, exp2) -> (get_attached_ty_list exp1) @ (get_attached_ty_list exp2)
     | LetRecExp (l, exp) -> (from_id_exp_list l) @ (get_attached_ty_list exp)
     | ListExp listExp -> from_listExp listExp
-    | MatchExp (l1, l2) -> (from_exp_list l1) @ (from_explist_exp_list l2)
+    | MatchExp (exp, l) -> (get_attached_ty_list exp) @ (from_explist_exp_list l)
+    | TupleExp tupleExp -> from_tupleExp tupleExp
     | Wildcard -> []
   in
   (from_exp exp) @ att_ty

@@ -61,6 +61,7 @@ Expr :
   | e=DFunExpr { e }
   | e=LetRecExpr { e }
   | e=MatchExpr { e }
+  | e=TupleHeadExpr { (TupleExp e, []) }
 
 LookRightExpr :
     e=IfExpr { e }
@@ -69,6 +70,7 @@ LookRightExpr :
   | e=DFunExpr { e }
   | e=LetRecExpr { e }
   | e=MatchExpr { e }
+  | e=TupleHeadExpr { (TupleExp e, []) }
 
 OrExpr :
     l=OrExpr OR r=AndExpr { (BinLogicOp(Or, l, r), []) }
@@ -197,15 +199,30 @@ LetRecAndExpr :
   | f=ID fe=LetFunExpr IN e2=Expr { let (e1, ty) = fe in ([((f, ty), e1)], e2) }
 
 MatchExpr :
-    MATCH e1=Expr e2=list(MoreExpr) WITH option(BAR) e3=PatternMatchExpr { (MatchExp (e1 :: e2, e3), []) }
+    MATCH e1=Expr WITH option(BAR) e2=PatternMatchExpr { (MatchExp (e1 , e2), []) }
 
-MoreExpr :
-    COMMA e=Expr { e }
+(*MoreExpr :
+    COMMA e=Expr { e }*)
+
+TupleHeadExpr :
+    e=Expr COMMA lst=TupleTailExpr { ConsT (e, lst) }
+
+TupleTailExpr :
+    e=Expr { ConsT (e, EmpT) }
+  | e=Expr COMMA lst=TupleTailExpr { ConsT (e, lst) }
 
 Pattern :
     LBOXBRA pt=Pattern RBOXBRA { (ListExp (Cons (pt, Emp)), []) }
   | pt1=Pattern CONS pt2=Pattern { (ListExp (Cons (pt1, Cons (pt2, Emp))), []) }
+  | pt=TupleHeadPattern { (TupleExp pt, []) }
   | pt=APattern { pt }
+
+TupleHeadPattern :
+    pt=Pattern COMMA lst=TupleTailPattern { ConsT (pt, lst) }
+
+TupleTailPattern :
+    pt=Pattern { ConsT (pt, EmpT) }
+  | pt=Pattern COMMA lst=TupleTailPattern { ConsT (pt, lst) }
 
 APattern :
     i=INTV { (ILit i, []) }
@@ -219,7 +236,7 @@ APattern :
   | LPAREN pt=Pattern COLON ty=FunType RPAREN { let (pt', l) = pt in (pt', ty :: l) }
 
 PatternMatchExpr :
-    pt=Patterns pts=list(MorePatterns) RARROW e1=Expr e2=list(MorePatternMatchExpr) {
+    pt=Pattern pts=list(MorePattern) RARROW e1=Expr e2=list(MorePatternMatchExpr) {
       let pattern_and_body_list = List.concat e2 in
       let rec link_pattern_with_body_andthen_cons = function
           [] -> (pt, e1) :: pattern_and_body_list
@@ -228,21 +245,15 @@ PatternMatchExpr :
         link_pattern_with_body_andthen_cons pts }
 
 MorePatternMatchExpr :
-    BAR pt=Patterns pts=list(MorePatterns) RARROW e=Expr {
+    BAR pt=Pattern pts=list(MorePattern) RARROW e=Expr {
       let rec link_pattern_with_body = function
           [] -> [(pt, e)]
         | head :: rest -> (head, e) :: link_pattern_with_body rest
       in
         link_pattern_with_body pts }
 
-Patterns :
-    pt=Pattern pts=list(MorePattern) { pt :: pts }
-
 MorePattern :
-    COMMA pt=Pattern { pt }
-
-MorePatterns :
-    BAR pt=Patterns { pt }
+    BAR pt=Pattern { pt }
 
 FunType :
     ty1=AType RARROW ty2=FunType { Tyfun (ty1, ty2) }

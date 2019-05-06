@@ -14,6 +14,8 @@ type ty =
   | TyVar of tyvar
   | TyFun of ty * ty
   | TyList of ty
+  | TyTuple of tytuple
+and tytuple = TyEmpT | TyConsT of ty * tytuple
 
 (* 型注釈が型変数であるときに識別するためのもの *)
 type attached_tyvar = string
@@ -26,8 +28,10 @@ type attached_ty =
   | Tyvar of attached_tyvar
   | Tyfun of attached_ty * attached_ty
   | Tylist of attached_ty
+  | Tytuple of attached_tytuple
   | Ranty of attached_ty
   | TransformedTyvar of tyvar
+and attached_tytuple = TyempT | TyconsT of attached_ty * attached_tytuple
 
 (* 型注釈付きのidを表す型 *)
 type typedId = id * attached_ty list
@@ -60,14 +64,16 @@ type exp =
   | LetRecExp of (typedId * typedExp) list * typedExp
   | ListExp of listExp
   (* ListExp(Cons(ILit 1, (Cons(ILit 2, Emp)))) --> [1;2] *)
-  | MatchExp of typedExp list * (typedExp list * typedExp) list
+  | MatchExp of typedExp * (typedExp * typedExp) list
   (* MatchExp([ILit 1; ILit 2],
               [([ILit 0; ILit 1], ILit 0); ([ILit 1; ILit 2], ILit 1)]) -->
      match 1, 2 with
        0, 1 -> 0
      | 1, 2 -> 1 *)
+  | TupleExp of tupleExp (* TupeExp (Cons(ILit 3, Cons (BLit true, Emp))) --> (3, true) *)
   | Wildcard (* Wildcard --> _ *)
 and listExp = Emp | Cons of typedExp * listExp
+and tupleExp = EmpT | ConsT of typedExp * tupleExp
 (* 型注釈付きの式を表す型 *)
 and typedExp = exp * attached_ty list
 
@@ -85,13 +91,19 @@ let tysc_of_ty ty = TyScheme ([], ty)
 
 
 let rec ty_of_attached_ty attached_ty stv_to_itv_list =
-  let rec body_func = function
+  let rec tytuple_of_attached_tytuple att_tytup =
+    match att_tytup with
+      TyempT -> TyEmpT
+    | TyconsT (att_ty, att_tytup') ->
+       TyConsT (body_func att_ty, tytuple_of_attached_tytuple att_tytup')
+  and body_func = function
       Tyint -> TyInt
     | Tybool -> TyBool
     | Tystring -> TyString
     | Tyvar tyvar -> TyVar (List.assoc tyvar stv_to_itv_list)
     | Tyfun (domty, ranty) -> TyFun ((body_func domty), (body_func ranty))
     | Tylist ty -> TyList (body_func ty)
+    | Tytuple tytup -> TyTuple (tytuple_of_attached_tytuple tytup)
     | _ -> TyInt (* this line cannot be done *)
   in
   body_func attached_ty
@@ -113,7 +125,13 @@ let string_of_num num =
 (* 型中の型変数と'a,'bなどの対応表を作る *)
 let make_tyvar_string_list ty =
   let counter = ref 0 in (* pp_tyが呼ばれるたびにこのカウンターは0に戻る、すなわち型変数は'aから始まる *)
-  let rec body_func ty ts_list =
+  let rec case_tytuple tytup ts_list =
+    match tytup with
+      TyEmpT -> ts_list
+    | TyConsT (ty, tytup') ->
+       let ts_list' = body_func ty ts_list in
+       case_tytuple tytup' ts_list'
+  and body_func ty ts_list =
     let num = !counter in
     match ty with
       TyInt
@@ -125,14 +143,23 @@ let make_tyvar_string_list ty =
     | TyFun (domty, ranty) ->
        let domty_ts_list = body_func domty ts_list in
        let ranty_ts_list = body_func ranty domty_ts_list in
-       domty_ts_list @ ranty_ts_list
+       ranty_ts_list
     | TyList ty' -> body_func ty' ts_list
+    | TyTuple tytup  -> case_tytuple tytup ts_list
   in
   body_func ty []
 
 let rec string_of_ty ty =
   let tyvar_string_list = make_tyvar_string_list ty in (* これを持ちまわるのが面倒だったのでbody_funcを作った *)
-  let rec body_func ty =
+  let rec string_of_tytuple tytup =
+    match tytup with
+      TyEmpT -> ")"
+    | TyConsT (ty, tytup') ->
+       (match ty with
+          TyFun (_, _)
+        | TyTuple _ -> "(" ^ (body_func ty) ^ " * " ^ (string_of_tytuple tytup')
+        | _ -> (body_func ty) ^ " * " ^ (string_of_tytuple tytup'))
+  and body_func ty =
     match ty with
       TyInt -> "int"
     | TyBool -> "bool"
@@ -143,8 +170,10 @@ let rec string_of_ty ty =
     | TyFun (domty, ranty) -> (body_func domty) ^ " -> " ^ (body_func ranty)
     | TyList ty ->
        (match ty with
-          TyFun (_, _) -> "(" ^ (body_func ty) ^ ")" ^ " list"
+          TyFun (_, _)
+        | TyTuple _  -> "(" ^ (body_func ty) ^ ")" ^ " list"
         | _ -> (body_func ty) ^ " list")
+    | TyTuple tytup -> string_of_tytuple tytup
   in
   body_func ty
 
@@ -163,7 +192,13 @@ let fresh_tyvar =
   in body
 
 
+
 let rec freevar_ty ty =
+  let rec freevar_tytuple tytup =
+    match tytup with
+      TyEmpT -> MySet.empty
+    | TyConsT (ty, tytup') -> MySet.union (freevar_ty ty) (freevar_tytuple tytup')
+  in
   match ty with
     TyInt
   | TyBool
@@ -171,6 +206,7 @@ let rec freevar_ty ty =
   | TyVar tyvar -> MySet.singleton tyvar
   | TyFun (domty, ranty) -> MySet.union (freevar_ty domty) (freevar_ty ranty)
   | TyList ty -> freevar_ty ty
+  | TyTuple tytup -> freevar_tytuple tytup
 
 let freevar_tysc tysc =
   match tysc with
