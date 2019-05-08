@@ -2,6 +2,8 @@ open Syntax
 open Eval
 open Typing
 
+let debug = ref false
+
 let rec read_eval_print env tyenv=
   print_string "# ";
   flush stdout;
@@ -12,8 +14,9 @@ let rec read_eval_print env tyenv=
   in
   try
     let decl = Parser.toplevel Lexer.main (Lexing.from_channel stdin) in
-    print_string (Debug.string_of_decl decl);
-    print_newline();
+    if !debug then
+      (print_string (Debug.string_of_decl decl);
+       print_newline());
     let tys = ty_decl tyenv decl in
     let decls = eval_decl env decl in
     let rec list_process exp_l ty_l env tyenv res_l =
@@ -88,6 +91,9 @@ let read_eval_print_from_file env tyenv filename =
          in
          try
            let decl = Parser.toplevel Lexer.main (Lexing.from_string str) in
+           if !debug then
+             (print_string (Debug.string_of_decl decl);
+              print_newline());
            let tys = ty_decl tyenv decl in
            let decls = eval_decl env decl in
            let rec list_process exp_l ty_l env tyenv res_l =
@@ -141,7 +147,13 @@ let initial_tyenv =
 
 let _ =
   try
-    let filename = Sys.argv.(1) in
-    read_eval_print_from_file initial_env initial_tyenv filename
+    let str  = Sys.argv.(1) in
+    if str = "-d" then
+      (debug := true;
+       let filename = Sys.argv.(2) in
+       read_eval_print_from_file initial_env initial_tyenv filename)
+    else
+      let filename = str in
+      read_eval_print_from_file initial_env initial_tyenv filename
   with
     Invalid_argument _ -> read_eval_print initial_env initial_tyenv

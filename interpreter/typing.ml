@@ -86,10 +86,7 @@ let make_eqs_about_att_ty ty attached_ty_list =
   let rec main_loop = function
       [] -> []
     | attached_ty :: rest ->
-       match attached_ty with
-         (* let f x1 ... xn : <型>　= ... の場合の<型>はfそのものではなくてfの値域の型となる *)
-         Ranty ty' -> (ty, TyFun (TyVar (fresh_tyvar ()), ty_of_attached_ty ty')) :: main_loop rest
-       | ty' -> (ty, ty_of_attached_ty ty') :: main_loop rest
+       (ty, ty_of_attached_ty attached_ty) :: main_loop rest
   in
   main_loop attached_ty_list
 

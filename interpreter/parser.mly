@@ -162,7 +162,7 @@ LetAndExpr :
   | f=ID et=LetFunExpr LETAND le=LetAndExpr { let (e1, ty) = et in let (l, e2) = le in (((f, ty), e1) :: l, e2) }
   | f=ID et=LetFunExpr IN e2=Expr { let (e1, ty) = et in ([((f, ty), e1)], e2) }
 
-LetFunExpr :
+(*LetFunExpr :
     p=nonempty_list(IDt) ty=option(WithType) EQ e=Expr {
       let rec loop = function
           [para] -> FunExp (para, e)
@@ -171,7 +171,21 @@ LetFunExpr :
         let exp = loop p in
         match ty with
           None -> ((exp, []), [])
-        | Some ty' -> ((exp, []), [ty']) }
+        | Some ty' -> ((exp, []), []) }*)
+
+LetFunExpr :
+    p=nonempty_list(IDt) ty=option(WithType) EQ e=Expr {
+      let rec loop = function
+          [para] ->
+           (match ty with
+              None -> FunExp (para, e)
+            | Some ty' ->
+               (match e with
+                  (e', att_ty) -> FunExp (para, (e', ty' :: att_ty))))
+        | head :: rest -> FunExp (head, (loop rest, []))
+      in
+        let exp = loop p in
+        ((exp, []), []) }
 
 FunExpr :
     FUN p=nonempty_list(IDt) RARROW e=Expr {
@@ -200,9 +214,6 @@ LetRecAndExpr :
 
 MatchExpr :
     MATCH e1=Expr WITH option(BAR) e2=PatternMatchExpr { (MatchExp (e1 , e2), []) }
-
-(*MoreExpr :
-    COMMA e=Expr { e }*)
 
 TupleTailExpr :
     e=Expr { ConsT (e, EmpT) }
