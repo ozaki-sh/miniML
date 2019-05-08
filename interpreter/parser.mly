@@ -162,17 +162,6 @@ LetAndExpr :
   | f=ID et=LetFunExpr LETAND le=LetAndExpr { let (e1, ty) = et in let (l, e2) = le in (((f, ty), e1) :: l, e2) }
   | f=ID et=LetFunExpr IN e2=Expr { let (e1, ty) = et in ([((f, ty), e1)], e2) }
 
-(*LetFunExpr :
-    p=nonempty_list(IDt) ty=option(WithType) EQ e=Expr {
-      let rec loop = function
-          [para] -> FunExp (para, e)
-        | head :: rest -> FunExp (head, (loop rest, []))
-      in
-        let exp = loop p in
-        match ty with
-          None -> ((exp, []), [])
-        | Some ty' -> ((exp, []), []) }*)
-
 LetFunExpr :
     p=nonempty_list(IDt) ty=option(WithType) EQ e=Expr {
       let rec loop = function
@@ -290,7 +279,7 @@ AType :
   | LPAREN ty=TupleType RPAREN { ty }
 
 WithType :
-    COLON ty=TupleType { Ranty ty }
+    COLON ty=TupleType { ty }
 
 IDt :
     x=ID { (x, []) }

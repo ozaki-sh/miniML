@@ -1,4 +1,4 @@
-(* ML interpreter / type reconstruction *)
+p(* ML interpreter / type reconstruction *)
 type id = string
 
 type binOp = Plus | Minus | Mult | Lt | Mt | Eq | Cons | Hat | Expo

@@ -186,7 +186,6 @@ let rec get_attached_tyvar_list = function
   | Tylist ty -> get_attached_tyvar_list ty
   | Tytuple TyempT -> []
   | Tytuple (TyconsT (ty, tytup)) -> (get_attached_tyvar_list ty) @ (get_attached_tyvar_list (Tytuple tytup))
-  | Ranty ty -> get_attached_tyvar_list ty
   | _ -> err ("For debug : this error cannot occur (get_attached_tyvar_list)")
 
 (* attached_tyの型変数とtyの型変数の対応表を作る *)
@@ -232,7 +231,6 @@ let rec transform exp_with_ty stv_to_itv_list =
     | Tyfun (domty, ranty) -> Tyfun (transform_att_ty domty, transform_att_ty ranty)
     | Tylist ty -> Tylist (transform_att_ty ty)
     | Tytuple tytup -> Tytuple (transform_att_tytuple tytup)
-    | Ranty ty -> Ranty (transform_att_ty ty)
     | _ -> err ("For debug : this error cannot occur")
   and transform_att_tytuple = function
       TyempT -> TyempT
@@ -290,7 +288,6 @@ let rec transform_decl decl stv_to_itv_list =
     | Tyfun (domty, ranty) -> Tyfun (transform_att_ty domty, transform_att_ty ranty)
     | Tylist ty -> Tylist (transform_att_ty ty)
     | Tytuple tytup -> Tytuple (transform_att_tytuple tytup)
-    | Ranty ty -> Ranty (transform_att_ty ty)
     | _ -> err ("For debug : this error cannot occur (transform_decl)")
   and transform_att_ty_list = function
       [] -> []
