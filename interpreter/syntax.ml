@@ -151,14 +151,18 @@ let make_tyvar_string_list ty =
 
 let rec string_of_ty ty =
   let tyvar_string_list = make_tyvar_string_list ty in (* これを持ちまわるのが面倒だったのでbody_funcを作った *)
-  let rec string_of_tytuple tytup =
-    match tytup with
-      TyEmpT -> ")"
-    | TyConsT (ty, tytup') ->
-       (match ty with
-          TyFun (_, _)
-        | TyTuple _ -> "(" ^ (body_func ty) ^ " * " ^ (string_of_tytuple tytup')
-        | _ -> (body_func ty) ^ " * " ^ (string_of_tytuple tytup'))
+  let rec  string_of_tytuple tytup =
+    let rec inner_loop tytup =
+      match tytup with
+        TyEmpT -> ""
+      | TyConsT (ty, tytup') ->
+         (match ty with
+            TyFun (_, _) -> "(" ^ (body_func ty) ^ ") * " ^ (inner_loop tytup')
+          | _ -> (body_func ty) ^ " * " ^ (inner_loop tytup'))
+    in
+    let str = inner_loop tytup in
+    let str_length = String.length str in
+    "(" ^ String.sub str 0 (str_length - 3) ^ ")"
   and body_func ty =
     match ty with
       TyInt -> "int"

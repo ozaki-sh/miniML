@@ -12,6 +12,8 @@ let rec read_eval_print env tyenv=
   in
   try
     let decl = Parser.toplevel Lexer.main (Lexing.from_channel stdin) in
+    print_string (Debug.string_of_decl decl);
+    print_newline();
     let tys = ty_decl tyenv decl in
     let decls = eval_decl env decl in
     let rec list_process exp_l ty_l env tyenv res_l =

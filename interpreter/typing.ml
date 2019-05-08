@@ -8,11 +8,16 @@ exception Error of string
 let err s = raise (Error s)
 
 let rec subst_type (subst : subst) t =
-  let rec subst_one_type (tv, ty) t =
+  let rec subst_tytuple (tv, ty) tytup =
+    match tytup with
+      TyEmpT -> TyEmpT
+    | TyConsT (ty', tytup') -> TyConsT (subst_one_type (tv, ty) ty', subst_tytuple (tv, ty) tytup')
+  and subst_one_type (tv, ty) t =
     match t with
       TyVar tv' when tv = tv' -> ty
     | TyFun (domty, ranty) -> TyFun (subst_one_type (tv, ty) domty, subst_one_type (tv, ty) ranty)
     | TyList ty' -> TyList (subst_one_type (tv, ty) ty')
+    | TyTuple tytup -> TyTuple (subst_tytuple (tv, ty) tytup)
     | _ -> t
   in
   match subst with
@@ -36,6 +41,11 @@ let rec unify = function
         x, y when x = y -> unify rest
       | TyFun (dty1, rty1), TyFun (dty2, rty2) -> unify ((dty1, dty2) :: (rty1, rty2) :: rest)
       | TyList ty', TyList ty'' -> unify ((ty', ty'') :: rest)
+      | TyTuple TyEmpT, TyTuple TyEmpT -> unify rest
+      | TyTuple TyEmpT, TyTuple (TyConsT (_, _))
+      | TyTuple (TyConsT (_, _)), TyTuple TyEmpT -> err ("Type error")
+      | TyTuple (TyConsT (ty1', tytup1)), TyTuple (TyConsT (ty2', tytup2)) ->
+         unify ((ty1', ty2') :: (TyTuple tytup1, TyTuple tytup2) :: rest)
       | TyVar alpha, _ ->
          if MySet.member alpha (freevar_ty ty2) then err ("Type error")
          else (alpha, ty2) :: unify (subst_eqs [(alpha, ty2)] rest)
@@ -64,9 +74,13 @@ let rec ty_of_attached_ty = function
   | Tystring -> TyString
   | Tyfun (domty, ranty) -> TyFun (ty_of_attached_ty domty, ty_of_attached_ty ranty)
   | Tylist ty -> TyList (ty_of_attached_ty ty)
+  | Tytuple tytup -> TyTuple (tytuple_of_attached_tytuple tytup)
   | TransformedTyvar tyvar -> TyVar tyvar
-  | _ -> err ("For debug : this error cannot occur")
+  | _ -> err ("For debug : this error cannot occur (ty_of_attached_ty)")
 
+and tytuple_of_attached_tytuple = function
+    TyempT -> TyEmpT
+  | TyconsT (ty, tytup) -> TyConsT (ty_of_attached_ty ty, tytuple_of_attached_tytuple tytup)
 
 let make_eqs_about_att_ty ty attached_ty_list =
   let rec main_loop = function
@@ -106,6 +120,11 @@ let rec pattern_match (pattern, att_ty) ty =
        let (id_and_ty_list1, subst_list1, eqs1) = pattern_match pt1 newTyVar in
        let (id_and_ty_list2, subst_list2, eqs2) = pattern_match pt2 ty in
        (id_and_ty_list1 @ id_and_ty_list2, (tyvar, TyList newTyVar) :: (subst_list1 @ subst_list2), eqs1 @ eqs2)
+    | TupleExp EmpT, TyTuple TyEmpT -> ([], [], [])
+    | TupleExp (ConsT (pt, l)), TyTuple (TyConsT (ty, tytup)) ->
+       let (id_and_ty_list1, subst_list1, eqs1) = pattern_match pt ty in
+       let (id_and_ty_list2, subst_list2, eqs2) = pattern_match ((TupleExp l, [])) (TyTuple tytup) in
+       (id_and_ty_list1 @ id_and_ty_list2, subst_list1 @ subst_list2, eqs1 @ eqs2)
     | Wildcard, _ -> ([], [], [])
     | _ -> err ("expression must have same type as pattern")
   in
@@ -131,12 +150,9 @@ let rec get_attached_ty_list (exp, att_ty) =
     and from_tupleExp = function
         EmpT -> []
       | ConsT (exp, l) -> (get_attached_ty_list exp) @ from_tupleExp l
-    and from_exp_list = function
+    and from_exp_exp_list = function
         [] -> []
-      | exp :: rest -> (get_attached_ty_list exp) @ from_exp_list rest
-    and from_explist_exp_list = function
-        [] -> []
-      | (explist, exp) :: rest -> (from_exp_list explist) @ (get_attached_ty_list exp) @ from_explist_exp_list rest
+      | (exp1, exp2) :: rest -> (get_attached_ty_list exp1) @ (get_attached_ty_list exp2) @ from_exp_exp_list rest
     in
     match exp with
       Var _
@@ -152,7 +168,7 @@ let rec get_attached_ty_list (exp, att_ty) =
     | AppExp (exp1, exp2) -> (get_attached_ty_list exp1) @ (get_attached_ty_list exp2)
     | LetRecExp (l, exp) -> (from_id_exp_list l) @ (get_attached_ty_list exp)
     | ListExp listExp -> from_listExp listExp
-    | MatchExp (exp, l) -> (get_attached_ty_list exp) @ (from_explist_exp_list l)
+    | MatchExp (exp, l) -> (get_attached_ty_list exp) @ (from_exp_exp_list l)
     | TupleExp tupleExp -> from_tupleExp tupleExp
     | Wildcard -> []
   in
@@ -171,8 +187,10 @@ let rec get_attached_tyvar_list = function
   | Tyvar tyvar -> [Tyvar tyvar]
   | Tyfun (domty, ranty) -> (get_attached_tyvar_list domty) @ (get_attached_tyvar_list ranty)
   | Tylist ty -> get_attached_tyvar_list ty
+  | Tytuple TyempT -> []
+  | Tytuple (TyconsT (ty, tytup)) -> (get_attached_tyvar_list ty) @ (get_attached_tyvar_list (Tytuple tytup))
   | Ranty ty -> get_attached_tyvar_list ty
-  | _ -> err ("For debug : this error cannot occur")
+  | _ -> err ("For debug : this error cannot occur (get_attached_tyvar_list)")
 
 (* attached_tyの型変数とtyの型変数の対応表を作る *)
 let make_Tyvar_to_TyVar_list exp =
@@ -183,7 +201,7 @@ let make_Tyvar_to_TyVar_list exp =
          Tyvar tyvar ->
           if List.exists (fun x -> x = tyvar) used_list then main_loop used_list rest
           else (tyvar, (fresh_tyvar ())) :: main_loop (tyvar :: used_list) rest
-       | _ -> err ("For debug : this error cannot occur")
+       | _ -> err ("For debug : this error cannot occur (make_Tyvar_to_tyvar_list)")
   in
   (* 式中の型注釈に使われている型を集めて *)
   let attached_ty_list = get_attached_ty_list exp in
@@ -200,7 +218,7 @@ let make_Tyvar_to_TyVar_list_for_decl decl =
          Tyvar tyvar ->
           if List.exists (fun x -> x = tyvar) used_list then main_loop used_list rest
           else (tyvar, (fresh_tyvar ())) :: main_loop (tyvar :: used_list) rest
-       | _ -> err ("For debug : this error cannot occur")
+       | _ -> err ("For debug : this error cannot occur (make_Tyvar_to_tyvar_list_for_decl)")
   in
   let attached_ty_list = get_attached_ty_list_from_decl decl in
   let attached_tyvar_list = List.concat (List.map (get_attached_tyvar_list) attached_ty_list) in
@@ -216,8 +234,12 @@ let rec transform exp_with_ty stv_to_itv_list =
     | Tyvar tyvar -> TransformedTyvar (List.assoc tyvar stv_to_itv_list)
     | Tyfun (domty, ranty) -> Tyfun (transform_att_ty domty, transform_att_ty ranty)
     | Tylist ty -> Tylist (transform_att_ty ty)
+    | Tytuple tytup -> Tytuple (transform_att_tytuple tytup)
     | Ranty ty -> Ranty (transform_att_ty ty)
     | _ -> err ("For debug : this error cannot occur")
+  and transform_att_tytuple = function
+      TyempT -> TyempT
+    | TyconsT (ty, tytup) -> TyconsT (transform_att_ty ty, transform_att_tytuple tytup)
   (* ある型のリストに使われている型変数をすべて変換する *)
   and transform_att_ty_list = function
       [] -> []
@@ -232,12 +254,12 @@ let rec transform exp_with_ty stv_to_itv_list =
       and transform_listExp = function
           Emp -> Emp
         | Cons (exp, l) -> Cons (body_func exp, transform_listExp l)
-      and transform_exp_list = function
+      and transform_tupleExp = function
+          EmpT -> EmpT
+        | ConsT (exp, l) -> ConsT (body_func exp, transform_tupleExp l)
+      and transform_exp_exp_list = function
           [] -> []
-        | exp :: rest -> (body_func exp) :: transform_exp_list rest
-      and transform_explist_exp_list = function
-          [] -> []
-        | (explist, exp) :: rest -> (transform_exp_list explist, body_func exp) :: transform_explist_exp_list rest
+        | (exp1, exp2) :: rest -> (body_func exp1, body_func exp2) :: (transform_exp_exp_list rest)
       in
       match exp with
         Var x -> Var x
@@ -253,7 +275,8 @@ let rec transform exp_with_ty stv_to_itv_list =
       | AppExp (exp1, exp2) -> AppExp (body_func exp1, body_func exp2)
       | LetRecExp (l, exp) -> LetRecExp (transform_id_exp_list l, body_func exp)
       | ListExp listExp -> ListExp (transform_listExp listExp)
-      | MatchExp (l1, l2) -> MatchExp (transform_exp_list l1, transform_explist_exp_list l2)
+      | MatchExp (l1, l2) -> MatchExp (body_func l1, transform_exp_exp_list l2)
+      | TupleExp tupleExp -> TupleExp (transform_tupleExp tupleExp)
       | Wildcard -> Wildcard
     in
     (transform_exp exp, transform_att_ty_list att_ty)
@@ -269,11 +292,15 @@ let rec transform_decl decl stv_to_itv_list =
     | Tyvar tyvar -> TransformedTyvar (List.assoc tyvar stv_to_itv_list)
     | Tyfun (domty, ranty) -> Tyfun (transform_att_ty domty, transform_att_ty ranty)
     | Tylist ty -> Tylist (transform_att_ty ty)
+    | Tytuple tytup -> Tytuple (transform_att_tytuple tytup)
     | Ranty ty -> Ranty (transform_att_ty ty)
-    | _ -> err ("For debug : this error cannot occur")
+    | _ -> err ("For debug : this error cannot occur (transform_decl)")
   and transform_att_ty_list = function
       [] -> []
     | attached_ty :: rest -> (transform_att_ty attached_ty) :: transform_att_ty_list rest
+  and transform_att_tytuple = function
+      TyempT -> TyempT
+    | TyconsT (ty, tytup) -> TyconsT (transform_att_ty ty, transform_att_tytuple tytup)
   in
   match decl with
     [] -> []
@@ -452,37 +479,21 @@ let rec ty_exp tyenv = function
             let s4 = unify eqs2 in
             (s4, subst_type s4 ty3)
          | _ -> err ("For debug : this error cannot occur"))
-  | (MatchExp (exps, pattern_and_body_list), att_ty) ->
-     let rec ty_exps = function
-         [] -> []
-       | head :: rest ->
-          (ty_exp tyenv head) :: ty_exps rest
-     in
-     let subst_ty_list1 = ty_exps exps in
-     let (subst_list1, tys1) = List.split subst_ty_list1 in
-     let subst1 = List.concat subst_list1 in
-     let eqs1 = eqs_of_subst subst1 in
+  | (MatchExp (exp, pattern_and_body_list), att_ty) ->
+     let (s1, ty) = ty_exp tyenv exp in
+     let eqs1 = eqs_of_subst s1 in
      (* 各パターン列を評価 *)
-     let rec outer_loop = function
+     let rec main_loop = function
          [] -> ([], [])
-       | (patterns, body) :: rest ->
-          let (id_and_ty_list, subst_list, eqs) = inner_loop patterns tys1 in
+       | (pattern, body) :: rest ->
+          let (id_and_ty_list, subst_list, eqs) = pattern_match pattern ty in
           if check_whether_duplication id_and_ty_list [] then
             err ("one variable is bound several times in this expression")
           else
             let newtyenv = bind_and_return_tyenv tyenv id_and_ty_list in
             let (subst, ty) = ty_exp newtyenv body in
-            let (subst_ty_list, eqs_list) = outer_loop rest in
+            let (subst_ty_list, eqs_list) = main_loop rest in
             ((subst @ subst_list, ty) :: subst_ty_list, eqs :: eqs_list)
-     (* パターン列を順にマッチさせていく *)
-     and inner_loop pt_l ty_l =
-       match pt_l, ty_l with
-         [pattern], [ty] -> pattern_match pattern ty
-       | (pattern :: pattern_rest), (ty :: ty_rest) ->
-          let (id_and_ty_list1, subst_list1, eqs1) = pattern_match pattern ty in
-          let (id_and_ty_list2, subst_list2, eqs2) = inner_loop pattern_rest ty_rest in
-          (id_and_ty_list1 @ id_and_ty_list2, subst_list1 @ subst_list2, eqs1 @ eqs2)
-       | _, _ -> err ("The number of patterns must be same as the number of expressions")
      (* 同一パターン列の中に同じ変数が現れてないかをチェック *)
      and check_whether_duplication checked_l id_l =
        match checked_l with
@@ -498,18 +509,34 @@ let rec ty_exp tyenv = function
           bind_and_return_tyenv newtyenv rest
      in
      (* 単一化 *)
-     let (subst_ty_list2, eqs_list) = outer_loop pattern_and_body_list in
-     let (subst_list2, tys2) = List.split subst_ty_list2 in
-     let subst2 = List.concat subst_list2 in
-     let eqs2 = eqs_of_subst subst2 in
-     let eqs3 = make_ty_eqs_list tys2 in
+     let (subst_ty_list, eqs_list) = main_loop pattern_and_body_list in
+     let (subst_list, tys) = List.split subst_ty_list in
+     let s2 = List.concat subst_list in
+     let eqs2 = eqs_of_subst s2 in
+     let eqs3 = make_ty_eqs_list tys in
      let eqs4 = List.concat eqs_list in
      let eqs5 = eqs1 @ eqs2 @ eqs3 @ eqs4 in
-     let s1 = unify eqs5 in
-     let ty = subst_type s1 (List.hd tys2) in
-     let eqs6 = (eqs_of_subst s1) @ (make_eqs_about_att_ty ty att_ty) in
-     let s2 = unify eqs6 in
-     (s2, subst_type s2 ty)
+     let s3 = unify eqs5 in
+     let ty = subst_type s3 (List.hd tys) in
+     let eqs6 = (eqs_of_subst s3) @ (make_eqs_about_att_ty ty att_ty) in
+     let s4 = unify eqs6 in
+     (s4, subst_type s4 ty)
+  | (TupleExp l, att_ty) ->
+     let rec ty_tupleExp l subst =
+       match l with
+         EmpT -> (subst, TyEmpT)
+       | ConsT (exp, l') ->
+          let (s, ty) = ty_exp tyenv exp in
+          let (subst', tytuple) = ty_tupleExp l' subst in
+          ((s @ subst'), TyConsT (ty, tytuple))
+     in
+     let (s1, tytuple) = ty_tupleExp l [] in
+     let eqs1 = eqs_of_subst s1 in
+     let s2 = unify eqs1 in
+     let ty = subst_type s2 (TyTuple tytuple) in
+     let eqs2 = (eqs_of_subst s2) @ (make_eqs_about_att_ty ty att_ty) in
+     let s3 = unify eqs2 in
+     (s3, subst_type s3 ty)
   | _ -> err ("not implemented yet")
 
 let ty_decl tyenv = function

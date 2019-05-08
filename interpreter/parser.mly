@@ -141,7 +141,7 @@ AExpr :
   | LBOXBRA RBOXBRA  { (ListExp Emp, []) }
   | e=ListHeadExpr { (ListExp e, []) }
   | LPAREN e=Expr RPAREN { e }
-  | LPAREN e=Expr COLON ty=FunType RPAREN { let (e', l) = e in (e', ty :: l) }
+  | LPAREN e=Expr COLON ty=TupleType RPAREN { let (e', l) = e in (e', ty :: l) }
 
 ListHeadExpr :
     LBOXBRA e=Expr lst=ListTailExpr { Cons (e, lst) }
@@ -204,12 +204,12 @@ MatchExpr :
 (*MoreExpr :
     COMMA e=Expr { e }*)
 
-TupleHeadExpr :
-    e=Expr COMMA lst=TupleTailExpr { ConsT (e, lst) }
-
 TupleTailExpr :
     e=Expr { ConsT (e, EmpT) }
   | e=Expr COMMA lst=TupleTailExpr { ConsT (e, lst) }
+
+TupleHeadExpr :
+    e=Expr COMMA lst=TupleTailExpr { ConsT (e, lst) }
 
 Pattern :
     LBOXBRA pt=Pattern RBOXBRA { (ListExp (Cons (pt, Emp)), []) }
@@ -217,12 +217,12 @@ Pattern :
   | pt=TupleHeadPattern { (TupleExp pt, []) }
   | pt=APattern { pt }
 
-TupleHeadPattern :
-    pt=Pattern COMMA lst=TupleTailPattern { ConsT (pt, lst) }
-
 TupleTailPattern :
     pt=Pattern { ConsT (pt, EmpT) }
   | pt=Pattern COMMA lst=TupleTailPattern { ConsT (pt, lst) }
+
+TupleHeadPattern :
+    pt=Pattern COMMA lst=TupleTailPattern { ConsT (pt, lst) }
 
 APattern :
     i=INTV { (ILit i, []) }
@@ -233,7 +233,7 @@ APattern :
   | LBOXBRA RBOXBRA { (ListExp Emp, []) }
   | UNDERSCORE { (Wildcard, []) }
   | LPAREN pt=Pattern RPAREN { pt }
-  | LPAREN pt=Pattern COLON ty=FunType RPAREN { let (pt', l) = pt in (pt', ty :: l) }
+  | LPAREN pt=Pattern COLON ty=TupleType RPAREN { let (pt', l) = pt in (pt', ty :: l) }
 
 PatternMatchExpr :
     pt=Pattern pts=list(MorePattern) RARROW e1=Expr e2=list(MorePatternMatchExpr) {
@@ -255,6 +255,17 @@ MorePatternMatchExpr :
 MorePattern :
     BAR pt=Pattern { pt }
 
+TupleTailType :
+    ty=TupleType { TyconsT (ty, TyempT) }
+  | ty1=TupleType MULT ty2=TupleTailType { TyconsT (ty1, ty2) }
+
+TupleHeadType :
+    ty1=TupleType MULT ty2=TupleTailType { TyconsT (ty1, ty2) }
+
+TupleType :
+    ty=TupleHeadType { Tytuple ty }
+  | ty=FunType { ty }
+
 FunType :
     ty1=AType RARROW ty2=FunType { Tyfun (ty1, ty2) }
   | ty=AType { ty }
@@ -265,14 +276,14 @@ AType :
   | STRING { Tystring }
   | tv=TYVAR { Tyvar tv }
   | ty=AType LIST { Tylist ty }
-  | LPAREN ty=FunType RPAREN { ty }
+  | LPAREN ty=TupleType RPAREN { ty }
 
 WithType :
-    COLON ty=FunType { Ranty ty }
+    COLON ty=TupleType { Ranty ty }
 
 IDt :
     x=ID { (x, []) }
-  | LPAREN x=IDt COLON ty=FunType RPAREN { let (x', l) = x in (x', ty :: l) }
+  | LPAREN x=IDt COLON ty=TupleType RPAREN { let (x', l) = x in (x', ty :: l) }
 
 
 
