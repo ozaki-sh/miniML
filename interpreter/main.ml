@@ -144,6 +144,7 @@ let initial_tyenv =
   Environment.extend "i" (TyScheme ([], TyInt))
     (Environment.extend "v" (TyScheme ([], TyInt))
       (Environment.extend "x" (TyScheme ([], TyInt)) Environment.empty))
+let initial_nameenv = Environment.empty
 
 let _ =
   try

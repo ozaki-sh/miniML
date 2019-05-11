@@ -1,7 +1,7 @@
 {
 let reservedWords = [
   (* Keywords *)
-  ("and", Parser.LETAND);
+  ("and", Parser.METAAND);
   ("bool", Parser.BOOL);
   ("dfun", Parser.DFUN);
   ("else", Parser.ELSE);
@@ -18,6 +18,7 @@ let reservedWords = [
   ("string", Parser.STRING);
   ("then", Parser.THEN);
   ("true", Parser.TRUE);
+  ("type", Parser.TYPE);
   ("with", Parser.WITH);
 ]
 }

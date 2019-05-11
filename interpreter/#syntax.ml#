@@ -81,7 +81,7 @@ type program =
     Exp of typedExp
   | Decls of ((typedId * typedExp) list) list
   | RecDecls of ((typedId * typedExp) list) list
-  | TypeDecls of ((id * typedExp) list) list
+
 
 
 type tysc = TyScheme of tyvar list * ty

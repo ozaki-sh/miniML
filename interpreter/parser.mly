@@ -6,7 +6,7 @@ open Syntax
 %token PLUS MINUS MULT LT MT HAT EXPO
 %token AND OR
 %token IF THEN ELSE TRUE FALSE
-%token LET IN EQ LETAND
+%token LET IN EQ METAAND
 %token RARROW FUN DFUN
 %token REC
 %token MATCH WITH BAR
@@ -31,15 +31,16 @@ toplevel :
     e=Expr SEMISEMI { Exp e }
   | d=LetDecl SEMISEMI { Decls d }
   | d=LetRecDecl SEMISEMI { RecDecls d }
+ (* | d=TypeDecl SEMISEMI { TypeDecls d }*)
 
 LetDecl :
     LET d1=LetAndDecl d2=LetDecl { d1 :: d2 }
   | LET d=LetAndDecl { [d] }
 
 LetAndDecl :
-    x=IDt EQ e=Expr LETAND d=LetAndDecl { (x, e) :: d }
+    x=IDt EQ e=Expr METAAND d=LetAndDecl { (x, e) :: d }
   | x=IDt EQ e=Expr { [(x, e)] }
-  | f=ID fe=LetFunExpr LETAND d=LetAndDecl { let (e, ty) = fe in ((f, ty), e) :: d }
+  | f=ID fe=LetFunExpr METAAND d=LetAndDecl { let (e, ty) = fe in ((f, ty), e) :: d }
   | f=ID fe=LetFunExpr { let (e, ty) = fe in [((f, ty), e)] }
 
 LetRecDecl :
@@ -47,10 +48,18 @@ LetRecDecl :
   | LET REC d=LetRecAndDecl { [d] }
 
 LetRecAndDecl :
-    f=IDt EQ e=FunExpr LETAND d=LetRecAndDecl { (f, e) :: d }
+    f=IDt EQ e=FunExpr METAAND d=LetRecAndDecl { (f, e) :: d }
   | f=IDt EQ e=FunExpr { [(f, e)] }
-  | f=ID fe=LetFunExpr LETAND d=LetRecAndDecl { let (e, ty) = fe in ((f, ty), e) :: d }
+  | f=ID fe=LetFunExpr METAAND d=LetRecAndDecl { let (e, ty) = fe in ((f, ty), e) :: d }
   | f=ID fe=LetFunExpr { let (e, ty) = fe in [((f, ty), e)] }
+
+TypeDecl :
+    TYPE d1=TypeAndDecl d2=TypeDecl { d1 :: d2 }
+  | TYPE d=TypeAndDecl { [d] }
+
+TypeAndDecl :
+    x=ID EQ e=Expr METAAND d=LetAndDecl { (x, e) :: d }
+  | x=ID EQ e=Expr { [(x, e)] }
 
 
 Expr :
@@ -147,7 +156,7 @@ ListHeadExpr :
     LBOXBRA e=Expr lst=ListTailExpr { Cons (e, lst) }
 
 ListTailExpr :
-    SEMI e=Expr lst=ListTailExpr { Cons (e, lst) }
+    SEMI e=Expr option(SEMI) lst=ListTailExpr { Cons (e, lst) }
   | RBOXBRA { Emp }
 
 IfExpr :
@@ -157,9 +166,9 @@ LetExpr :
     LET le=LetAndExpr { let (l, e) = le in (LetExp (l, e), []) }
 
 LetAndExpr :
-    x=IDt EQ e1=Expr LETAND le=LetAndExpr { let (l, e2) = le in ((x, e1) :: l, e2) }
+    x=IDt EQ e1=Expr METAAND le=LetAndExpr { let (l, e2) = le in ((x, e1) :: l, e2) }
   | x=IDt EQ e1=Expr IN e2=Expr { ([(x, e1)], e2) }
-  | f=ID et=LetFunExpr LETAND le=LetAndExpr { let (e1, ty) = et in let (l, e2) = le in (((f, ty), e1) :: l, e2) }
+  | f=ID et=LetFunExpr METAAND le=LetAndExpr { let (e1, ty) = et in let (l, e2) = le in (((f, ty), e1) :: l, e2) }
   | f=ID et=LetFunExpr IN e2=Expr { let (e1, ty) = et in ([((f, ty), e1)], e2) }
 
 LetFunExpr :
@@ -196,9 +205,9 @@ LetRecExpr :
     LET REC le=LetRecAndExpr { let (l, e) = le in (LetRecExp (l, e), []) }
 
 LetRecAndExpr :
-    f=IDt EQ e1=FunExpr LETAND le=LetRecAndExpr { let (l, e2) = le in ((f, e1) :: l, e2) }
+    f=IDt EQ e1=FunExpr METAAND le=LetRecAndExpr { let (l, e2) = le in ((f, e1) :: l, e2) }
   | f=IDt EQ e1=FunExpr IN e2=Expr { ([(f, e1)], e2) }
-  | f=ID fe=LetFunExpr LETAND le=LetRecAndExpr { let (e1, ty) = fe in let (l, e2) = le in (((f, ty), e1) :: l, e2) }
+  | f=ID fe=LetFunExpr METAAND le=LetRecAndExpr { let (e1, ty) = fe in let (l, e2) = le in (((f, ty), e1) :: l, e2) }
   | f=ID fe=LetFunExpr IN e2=Expr { let (e1, ty) = fe in ([((f, ty), e1)], e2) }
 
 MatchExpr :
