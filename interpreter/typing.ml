@@ -67,26 +67,11 @@ let closure ty (tyenv : tyenv) subst =
   let ids = MySet.diff (freevar_ty ty) fv_tyenv in
   TyScheme (MySet.to_list ids, ty)
 
-
-let rec ty_of_attached_ty = function
-    Tyint -> TyInt
-  | Tybool -> TyBool
-  | Tystring -> TyString
-  | Tyfun (domty, ranty) -> TyFun (ty_of_attached_ty domty, ty_of_attached_ty ranty)
-  | Tylist ty -> TyList (ty_of_attached_ty ty)
-  | Tytuple tytup -> TyTuple (tytuple_of_attached_tytuple tytup)
-  | TransformedTyvar tyvar -> TyVar tyvar
-  | _ -> err ("For debug : this error cannot occur (ty_of_attached_ty)")
-
-and tytuple_of_attached_tytuple = function
-    TyempT -> TyEmpT
-  | TyconsT (ty, tytup) -> TyConsT (ty_of_attached_ty ty, tytuple_of_attached_tytuple tytup)
-
 let make_eqs_about_att_ty ty attached_ty_list =
   let rec main_loop = function
       [] -> []
     | attached_ty :: rest ->
-       (ty, ty_of_attached_ty attached_ty) :: main_loop rest
+       (ty, attached_ty) :: main_loop rest
   in
   main_loop attached_ty_list
 
@@ -176,16 +161,17 @@ let rec get_attached_ty_list_from_decl = function
     [] -> []
   | ((id, att_ty), exp) :: rest -> att_ty @ (get_attached_ty_list exp) @ get_attached_ty_list_from_decl rest
 
-(* あるattached_tyに現れるすべてのTyvarのリストを返す *)
+(* あるattached_tyに現れるすべてのTyStringVarのリストを返す *)
 let rec get_attached_tyvar_list = function
-    Tyint -> []
-  | Tybool -> []
-  | Tystring -> []
-  | Tyvar tyvar -> [Tyvar tyvar]
-  | Tyfun (domty, ranty) -> (get_attached_tyvar_list domty) @ (get_attached_tyvar_list ranty)
-  | Tylist ty -> get_attached_tyvar_list ty
-  | Tytuple TyempT -> []
-  | Tytuple (TyconsT (ty, tytup)) -> (get_attached_tyvar_list ty) @ (get_attached_tyvar_list (Tytuple tytup))
+    TyInt -> []
+  | TyBool -> []
+  | TyString -> []
+  | TyVar _ -> []
+  | TyStringVar tyvar -> [TyStringVar tyvar]
+  | TyFun (domty, ranty) -> (get_attached_tyvar_list domty) @ (get_attached_tyvar_list ranty)
+  | TyList ty -> get_attached_tyvar_list ty
+  | TyTuple TyEmpT -> []
+  | TyTuple (TyConsT (ty, tytup)) -> (get_attached_tyvar_list ty) @ (get_attached_tyvar_list (TyTuple tytup))
   | _ -> err ("For debug : this error cannot occur (get_attached_tyvar_list)")
 
 (* attached_tyの型変数とtyの型変数の対応表を作る *)
@@ -194,7 +180,7 @@ let make_Tyvar_to_TyVar_list exp =
       [] -> []
     | attached_ty :: rest ->
        match attached_ty with
-         Tyvar tyvar ->
+         TyStringVar tyvar ->
           if List.exists (fun x -> x = tyvar) used_list then main_loop used_list rest
           else (tyvar, (fresh_tyvar ())) :: main_loop (tyvar :: used_list) rest
        | _ -> err ("For debug : this error cannot occur (make_Tyvar_to_tyvar_list)")
@@ -211,7 +197,7 @@ let make_Tyvar_to_TyVar_list_for_decl decl =
       [] -> []
     | attached_ty :: rest ->
        match attached_ty with
-         Tyvar tyvar ->
+         TyStringVar tyvar ->
           if List.exists (fun x -> x = tyvar) used_list then main_loop used_list rest
           else (tyvar, (fresh_tyvar ())) :: main_loop (tyvar :: used_list) rest
        | _ -> err ("For debug : this error cannot occur (make_Tyvar_to_tyvar_list_for_decl)")
@@ -224,17 +210,17 @@ let make_Tyvar_to_TyVar_list_for_decl decl =
 let rec transform exp_with_ty stv_to_itv_list =
   (* ある型に使われている型変数をすべて変換する *)
   let rec transform_att_ty = function
-      Tyint -> Tyint
-    | Tybool -> Tybool
-    | Tystring -> Tystring
-    | Tyvar tyvar -> TransformedTyvar (List.assoc tyvar stv_to_itv_list)
-    | Tyfun (domty, ranty) -> Tyfun (transform_att_ty domty, transform_att_ty ranty)
-    | Tylist ty -> Tylist (transform_att_ty ty)
-    | Tytuple tytup -> Tytuple (transform_att_tytuple tytup)
+      TyInt -> TyInt
+    | TyBool -> TyBool
+    | TyString -> TyString
+    | TyStringVar tyvar -> TyVar (List.assoc tyvar stv_to_itv_list)
+    | TyFun (domty, ranty) -> TyFun (transform_att_ty domty, transform_att_ty ranty)
+    | TyList ty -> TyList (transform_att_ty ty)
+    | TyTuple tytup -> TyTuple (transform_att_tytuple tytup)
     | _ -> err ("For debug : this error cannot occur")
   and transform_att_tytuple = function
-      TyempT -> TyempT
-    | TyconsT (ty, tytup) -> TyconsT (transform_att_ty ty, transform_att_tytuple tytup)
+      TyEmpT -> TyEmpT
+    | TyConsT (ty, tytup) -> TyConsT (transform_att_ty ty, transform_att_tytuple tytup)
   (* ある型のリストに使われている型変数をすべて変換する *)
   and transform_att_ty_list = function
       [] -> []
@@ -281,20 +267,20 @@ let rec transform exp_with_ty stv_to_itv_list =
 (* let宣言、 let rec宣言用 *)
 let rec transform_decl decl stv_to_itv_list =
   let rec transform_att_ty = function
-      Tyint -> Tyint
-    | Tybool -> Tybool
-    | Tystring -> Tystring
-    | Tyvar tyvar -> TransformedTyvar (List.assoc tyvar stv_to_itv_list)
-    | Tyfun (domty, ranty) -> Tyfun (transform_att_ty domty, transform_att_ty ranty)
-    | Tylist ty -> Tylist (transform_att_ty ty)
-    | Tytuple tytup -> Tytuple (transform_att_tytuple tytup)
+      TyInt -> TyInt
+    | TyBool -> TyBool
+    | TyString -> TyString
+    | TyStringVar tyvar -> TyVar (List.assoc tyvar stv_to_itv_list)
+    | TyFun (domty, ranty) -> TyFun (transform_att_ty domty, transform_att_ty ranty)
+    | TyList ty -> TyList (transform_att_ty ty)
+    | TyTuple tytup -> TyTuple (transform_att_tytuple tytup)
     | _ -> err ("For debug : this error cannot occur (transform_decl)")
   and transform_att_ty_list = function
       [] -> []
     | attached_ty :: rest -> (transform_att_ty attached_ty) :: transform_att_ty_list rest
   and transform_att_tytuple = function
-      TyempT -> TyempT
-    | TyconsT (ty, tytup) -> TyconsT (transform_att_ty ty, transform_att_tytuple tytup)
+      TyEmpT -> TyEmpT
+    | TyConsT (ty, tytup) -> TyConsT (transform_att_ty ty, transform_att_tytuple tytup)
   in
   match decl with
     [] -> []

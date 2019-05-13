@@ -1,4 +1,8 @@
 (* ML interpreter / type reconstruction *)
+exception Error of string
+
+let err s = raise (Error s)
+
 type id = string
 
 type binOp = Plus | Minus | Mult | Lt | Mt | Eq | Cons | Hat | Expo
@@ -12,30 +16,15 @@ type ty =
   | TyBool
   | TyString
   | TyVar of tyvar
+  | TyStringVar of string
   | TyFun of ty * ty
   | TyList of ty
   | TyTuple of tytuple
   | TyUser of id
 and tytuple = TyEmpT | TyConsT of ty * tytuple
 
-(* 型注釈が型変数であるときに識別するためのもの *)
-type attached_tyvar = string
-
-(* 型注釈を表す型 *)
-type attached_ty =
-    Tyint
-  | Tybool
-  | Tystring
-  | Tyvar of attached_tyvar
-  | Tyfun of attached_ty * attached_ty
-  | Tylist of attached_ty
-  | Tytuple of attached_tytuple
-  | Tyuser of id
-  | TransformedTyvar of tyvar
-and attached_tytuple = TyempT | TyconsT of attached_ty * attached_tytuple
-
 (* 型注釈付きのidを表す型 *)
-type typedId = id * attached_ty list
+type typedId = id * ty list
 
 
 type exp =
@@ -76,7 +65,7 @@ type exp =
 and listExp = Emp | Cons of typedExp * listExp
 and tupleExp = EmpT | ConsT of typedExp * tupleExp
 (* 型注釈付きの式を表す型 *)
-and typedExp = exp * attached_ty list
+and typedExp = exp * ty list
 
 type tydecl =
     Constructor of id * ty option
@@ -93,25 +82,6 @@ type tysc = TyScheme of tyvar list * ty
 
 
 let tysc_of_ty ty = TyScheme ([], ty)
-
-
-let rec ty_of_attached_ty attached_ty stv_to_itv_list =
-  let rec tytuple_of_attached_tytuple att_tytup =
-    match att_tytup with
-      TyempT -> TyEmpT
-    | TyconsT (att_ty, att_tytup') ->
-       TyConsT (body_func att_ty, tytuple_of_attached_tytuple att_tytup')
-  and body_func = function
-      Tyint -> TyInt
-    | Tybool -> TyBool
-    | Tystring -> TyString
-    | Tyvar tyvar -> TyVar (List.assoc tyvar stv_to_itv_list)
-    | Tyfun (domty, ranty) -> TyFun ((body_func domty), (body_func ranty))
-    | Tylist ty -> TyList (body_func ty)
-    | Tytuple tytup -> TyTuple (tytuple_of_attached_tytuple tytup)
-    | _ -> TyInt (* this line cannot be done *)
-  in
-  body_func attached_ty
 
 
 (* 0-25をa-zに変換する *)
@@ -145,6 +115,7 @@ let make_tyvar_string_list ty =
     | TyVar tyvar ->
        if List.mem_assoc tyvar ts_list then ts_list
        else (counter := num + 1; (tyvar, string_of_num num) :: ts_list)
+    | TyStringVar _ -> err  ("For debug: remain string tyvar")
     | TyFun (domty, ranty) ->
        let domty_ts_list = body_func domty ts_list in
        let ranty_ts_list = body_func ranty domty_ts_list in
@@ -174,6 +145,7 @@ let rec string_of_ty ty =
     | TyBool -> "bool"
     | TyString -> "string"
     | TyVar tyvar -> List.assoc tyvar tyvar_string_list
+    | TyStringVar _ -> err ("For debug: remain string tyvar")
     | TyFun (TyFun (_, _) as domty, ranty) -> "(" ^ (body_func domty) ^ ")" ^
                                                 " -> " ^ (body_func ranty)
     | TyFun (domty, ranty) -> (body_func domty) ^ " -> " ^ (body_func ranty)
@@ -213,6 +185,7 @@ let rec freevar_ty ty =
   | TyBool
   | TyString -> MySet.empty
   | TyVar tyvar -> MySet.singleton tyvar
+  | TyStringVar _ -> err ("For debug: remain string tyvar")
   | TyFun (domty, ranty) -> MySet.union (freevar_ty domty) (freevar_ty ranty)
   | TyList ty -> freevar_ty ty
   | TyTuple tytup -> freevar_tytuple tytup

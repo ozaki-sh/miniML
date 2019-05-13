@@ -151,7 +151,7 @@ AExpr :
   | LBOXBRA RBOXBRA  { (ListExp Emp, []) }
   | e=ListHeadExpr { (ListExp e, []) }
   | LPAREN e=Expr RPAREN { e }
-  | LPAREN e=Expr COLON ty=AttTupleType RPAREN { let (e', l) = e in (e', ty :: l) }
+  | LPAREN e=Expr COLON ty=TupleType RPAREN { let (e', l) = e in (e', ty :: l) }
 
 ListHeadExpr :
     LBOXBRA e=Expr lst=ListTailExpr { Cons (e, lst) }
@@ -243,7 +243,7 @@ APattern :
   | LBOXBRA RBOXBRA { (ListExp Emp, []) }
   | UNDERSCORE { (Wildcard, []) }
   | LPAREN pt=Pattern RPAREN { pt }
-  | LPAREN pt=Pattern COLON ty=AttTupleType RPAREN { let (pt', l) = pt in (pt', ty :: l) }
+  | LPAREN pt=Pattern COLON ty=TupleType RPAREN { let (pt', l) = pt in (pt', ty :: l) }
 
 PatternMatchExpr :
     pt=Pattern pts=list(MorePattern) RARROW e1=Expr e2=list(MorePatternMatchExpr) {
@@ -265,36 +265,12 @@ MorePatternMatchExpr :
 MorePattern :
     BAR pt=Pattern { pt }
 
-AttTupleTailType :
-    ty=AttTupleType { TyconsT (ty, TyempT) }
-  | ty1=AttTupleType MULT ty2=AttTupleTailType { TyconsT (ty1, ty2) }
-
-AttTupleHeadType :
-    ty1=AttTupleType MULT ty2=AttTupleTailType { TyconsT (ty1, ty2) }
-
-AttTupleType :
-    ty=AttTupleHeadType { Tytuple ty }
-  | ty=AttFunType { ty }
-
-AttFunType :
-    ty1=AttAType RARROW ty2=AttFunType { Tyfun (ty1, ty2) }
-  | ty=AttAType { ty }
-
-AttAType :
-    INT { Tyint }
-  | BOOL { Tybool }
-  | STRING { Tystring }
-  | tv=TYVAR { Tyvar tv }
-  | ty=AttAType LIST { Tylist ty }
-  | x=ID { Tyuser x }
-  | LPAREN ty=AttTupleType RPAREN { ty }
-
 WithType :
-    COLON ty=AttTupleType { ty }
+    COLON ty=TupleType { ty }
 
 IDt :
     x=ID { (x, []) }
-  | LPAREN x=IDt COLON ty=AttTupleType RPAREN { let (x', l) = x in (x', ty :: l) }
+  | LPAREN x=IDt COLON ty=TupleType RPAREN { let (x', l) = x in (x', ty :: l) }
 
 Type :
     t=nonempty_list(VariantType) { t }
@@ -325,7 +301,7 @@ AType :
     INT { TyInt }
   | BOOL { TyBool }
   | STRING { TyString }
-  | tv=TYVAR { TyVar tv }
+  | tv=TYVAR { TyStringVar tv }
   | ty=AType LIST { TyList ty }
   | x=ID { TyUser x }
   | LPAREN ty=TupleType RPAREN { ty }
