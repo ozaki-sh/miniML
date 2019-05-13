@@ -13,6 +13,7 @@ let reservedWords = [
   ("let", Parser.LET);
   ("list", Parser.LIST);
   ("match", Parser.MATCH);
+  ("of", Parser.OF);
   ("rec", Parser.REC);
   ("ref", Parser.REF);
   ("string", Parser.STRING);
@@ -60,7 +61,7 @@ rule main = parse
 | "}" { Parser.RCLYBRA }
 | "." { Parser.DOT }
 
-| ['a'-'z'] ['a'-'z' '0'-'9' '_' '\'']*
+| ['a'-'z'] ['a'-'z' 'A'-'Z' '0'-'9' '_' '\'']*
     { let id = Lexing.lexeme lexbuf in
       try
         List.assoc id reservedWords
@@ -73,8 +74,13 @@ rule main = parse
       let len = String.length str in
       Parser.STRINGV (String.sub str 1 (len - 2)) }
 
-| ['''] ['a'-'z'] ['a'-'z' '0'-'9' '_']*
+| ['''] ['a'-'z' 'A'-'Z'] ['a'-'z' 'A'-'Z' '0'-'9' '_']*
     { let tyvar = Lexing.lexeme lexbuf in Parser.TYVAR tyvar }
+
+| ['A'-'Z'] ['a'-'z' 'A'-'Z' '0'-'9' '_' '\'']*
+    { let c = Lexing.lexeme lexbuf in
+      Parser.CNSTR c
+     }
 
 | eof { exit 0 }
 

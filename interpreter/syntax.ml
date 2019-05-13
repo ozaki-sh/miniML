@@ -15,6 +15,7 @@ type ty =
   | TyFun of ty * ty
   | TyList of ty
   | TyTuple of tytuple
+  | TyUser of id
 and tytuple = TyEmpT | TyConsT of ty * tytuple
 
 (* 型注釈が型変数であるときに識別するためのもの *)
@@ -29,6 +30,7 @@ type attached_ty =
   | Tyfun of attached_ty * attached_ty
   | Tylist of attached_ty
   | Tytuple of attached_tytuple
+  | Tyuser of id
   | TransformedTyvar of tyvar
 and attached_tytuple = TyempT | TyconsT of attached_ty * attached_tytuple
 
@@ -76,12 +78,15 @@ and tupleExp = EmpT | ConsT of typedExp * tupleExp
 (* 型注釈付きの式を表す型 *)
 and typedExp = exp * attached_ty list
 
+type tydecl =
+    Constructor of id * ty option
+  | Field of id * ty
 
 type program =
     Exp of typedExp
   | Decls of ((typedId * typedExp) list) list
   | RecDecls of ((typedId * typedExp) list) list
-  | TypeDecls of ((id * typedExp) list) list
+  | TypeDecls of ((id * tydecl list) list) list
 
 
 type tysc = TyScheme of tyvar list * ty

@@ -16,12 +16,13 @@ open Syntax
 %token INT BOOL STRING LIST
 %token LCLYBRA RCLYBRA DOT
 %token REF COLONEQ EXCLM
-%token TYPE
+%token TYPE OF
 
 %token <int> INTV
 %token <Syntax.id> ID
 %token <string> TYVAR
 %token <string> STRINGV
+%token <string> CNSTR
 
 %start toplevel
 %type <Syntax.program> toplevel
@@ -31,7 +32,7 @@ toplevel :
     e=Expr SEMISEMI { Exp e }
   | d=LetDecl SEMISEMI { Decls d }
   | d=LetRecDecl SEMISEMI { RecDecls d }
- (* | d=TypeDecl SEMISEMI { TypeDecls d }*)
+  | d=TypeDecl SEMISEMI { TypeDecls d }
 
 LetDecl :
     LET d1=LetAndDecl d2=LetDecl { d1 :: d2 }
@@ -58,8 +59,8 @@ TypeDecl :
   | TYPE d=TypeAndDecl { [d] }
 
 TypeAndDecl :
-    x=ID EQ e=Expr METAAND d=LetAndDecl { (x, e) :: d }
-  | x=ID EQ e=Expr { [(x, e)] }
+    x=ID EQ t=Type METAAND d=TypeAndDecl { (x, t) :: d }
+  | x=ID EQ t=Type { [(x, t)] }
 
 
 Expr :
@@ -150,7 +151,7 @@ AExpr :
   | LBOXBRA RBOXBRA  { (ListExp Emp, []) }
   | e=ListHeadExpr { (ListExp e, []) }
   | LPAREN e=Expr RPAREN { e }
-  | LPAREN e=Expr COLON ty=TupleType RPAREN { let (e', l) = e in (e', ty :: l) }
+  | LPAREN e=Expr COLON ty=AttTupleType RPAREN { let (e', l) = e in (e', ty :: l) }
 
 ListHeadExpr :
     LBOXBRA e=Expr lst=ListTailExpr { Cons (e, lst) }
@@ -242,7 +243,7 @@ APattern :
   | LBOXBRA RBOXBRA { (ListExp Emp, []) }
   | UNDERSCORE { (Wildcard, []) }
   | LPAREN pt=Pattern RPAREN { pt }
-  | LPAREN pt=Pattern COLON ty=TupleType RPAREN { let (pt', l) = pt in (pt', ty :: l) }
+  | LPAREN pt=Pattern COLON ty=AttTupleType RPAREN { let (pt', l) = pt in (pt', ty :: l) }
 
 PatternMatchExpr :
     pt=Pattern pts=list(MorePattern) RARROW e1=Expr e2=list(MorePatternMatchExpr) {
@@ -264,35 +265,71 @@ MorePatternMatchExpr :
 MorePattern :
     BAR pt=Pattern { pt }
 
-TupleTailType :
-    ty=TupleType { TyconsT (ty, TyempT) }
-  | ty1=TupleType MULT ty2=TupleTailType { TyconsT (ty1, ty2) }
+AttTupleTailType :
+    ty=AttTupleType { TyconsT (ty, TyempT) }
+  | ty1=AttTupleType MULT ty2=AttTupleTailType { TyconsT (ty1, ty2) }
 
-TupleHeadType :
-    ty1=TupleType MULT ty2=TupleTailType { TyconsT (ty1, ty2) }
+AttTupleHeadType :
+    ty1=AttTupleType MULT ty2=AttTupleTailType { TyconsT (ty1, ty2) }
 
-TupleType :
-    ty=TupleHeadType { Tytuple ty }
-  | ty=FunType { ty }
+AttTupleType :
+    ty=AttTupleHeadType { Tytuple ty }
+  | ty=AttFunType { ty }
 
-FunType :
-    ty1=AType RARROW ty2=FunType { Tyfun (ty1, ty2) }
-  | ty=AType { ty }
+AttFunType :
+    ty1=AttAType RARROW ty2=AttFunType { Tyfun (ty1, ty2) }
+  | ty=AttAType { ty }
 
-AType :
+AttAType :
     INT { Tyint }
   | BOOL { Tybool }
   | STRING { Tystring }
   | tv=TYVAR { Tyvar tv }
-  | ty=AType LIST { Tylist ty }
-  | LPAREN ty=TupleType RPAREN { ty }
+  | ty=AttAType LIST { Tylist ty }
+  | x=ID { Tyuser x }
+  | LPAREN ty=AttTupleType RPAREN { ty }
 
 WithType :
-    COLON ty=TupleType { ty }
+    COLON ty=AttTupleType { ty }
 
 IDt :
     x=ID { (x, []) }
-  | LPAREN x=IDt COLON ty=TupleType RPAREN { let (x', l) = x in (x', ty :: l) }
+  | LPAREN x=IDt COLON ty=AttTupleType RPAREN { let (x', l) = x in (x', ty :: l) }
+
+Type :
+    t=nonempty_list(VariantType) { t }
+
+VariantType :
+    c=CNSTR { (Constructor (c, None)) }
+  | c=CNSTR OF a=Arg { Constructor (c, Some a) }
+
+Arg :
+    t=TupleType { t }
+
+TupleTailType :
+    ty=TupleType { TyConsT (ty, TyEmpT) }
+  | ty1=TupleType MULT ty2=TupleTailType { TyConsT (ty1, ty2) }
+
+TupleHeadType :
+    ty1=TupleType MULT ty2=TupleTailType { TyConsT (ty1, ty2) }
+
+TupleType :
+    ty=TupleHeadType { TyTuple ty }
+  | ty=FunType { ty }
+
+FunType :
+    ty1=AType RARROW ty2=FunType { TyFun (ty1, ty2) }
+  | ty=AType { ty }
+
+AType :
+    INT { TyInt }
+  | BOOL { TyBool }
+  | STRING { TyString }
+  | tv=TYVAR { TyVar tv }
+  | ty=AType LIST { TyList ty }
+  | x=ID { TyUser x }
+  | LPAREN ty=TupleType RPAREN { ty }
+
 
 
 
