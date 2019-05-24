@@ -7,6 +7,9 @@ exception Error of string
 
 let err s = raise (Error s)
 
+let defenv = ref []
+let rev_defenv = ref []
+
 let rec subst_type (subst : subst) t =
   let rec subst_tytuple (tv, ty) tytup =
     match tytup with
@@ -141,6 +144,8 @@ let rec get_attached_ty_list (exp, att_ty) =
     | ILit _
     | BLit _
     | SLit _ -> []
+    | Constr (_, None) -> []
+    | Constr (_, Some exp) -> get_attached_ty_list exp
     | BinOp (_, exp1, exp2) -> (get_attached_ty_list exp1) @ (get_attached_ty_list exp2)
     | BinLogicOp (_, exp1, exp2) -> (get_attached_ty_list exp1) @ (get_attached_ty_list exp2)
     | IfExp (exp1, exp2, exp3) -> (get_attached_ty_list exp1) @ (get_attached_ty_list exp2) @ (get_attached_ty_list exp3)
@@ -172,6 +177,7 @@ let rec get_attached_tyvar_list = function
   | TyList ty -> get_attached_tyvar_list ty
   | TyTuple TyEmpT -> []
   | TyTuple (TyConsT (ty, tytup)) -> (get_attached_tyvar_list ty) @ (get_attached_tyvar_list (TyTuple tytup))
+  | TyUser _ -> []
   | _ -> err ("For debug : this error cannot occur (get_attached_tyvar_list)")
 
 (* attached_tyの型変数とtyの型変数の対応表を作る *)
@@ -217,6 +223,7 @@ let rec transform exp_with_ty stv_to_itv_list =
     | TyFun (domty, ranty) -> TyFun (transform_att_ty domty, transform_att_ty ranty)
     | TyList ty -> TyList (transform_att_ty ty)
     | TyTuple tytup -> TyTuple (transform_att_tytuple tytup)
+    | TyUser x -> TyUser x
     | _ -> err ("For debug : this error cannot occur")
   and transform_att_tytuple = function
       TyEmpT -> TyEmpT
@@ -247,6 +254,8 @@ let rec transform exp_with_ty stv_to_itv_list =
       | ILit i -> ILit i
       | BLit b -> BLit b
       | SLit s -> SLit s
+      | Constr (id, None) -> Constr (id, None)
+      | Constr (id, Some exp) -> Constr (id, Some (body_func exp))
       | BinOp (op, exp1, exp2) -> BinOp (op, body_func exp1, body_func exp2)
       | BinLogicOp (op, exp1, exp2) -> BinLogicOp (op, body_func exp1, body_func exp2)
       | IfExp (exp1, exp2, exp3) -> IfExp (body_func exp1, body_func exp2, body_func exp3)
@@ -332,6 +341,10 @@ let rec ty_exp tyenv = function
      let eqs = make_eqs_about_att_ty TyString att_ty in
      let s = unify eqs in
      (s, TyString)
+  | (Constr (id, tyop), att_ty) ->
+     (try
+        let tyuser_l = Rev_environment.lookup (Constructor (id, tyop)) rev_defenv in
+        
   | (BinOp (op, exp1, exp2), att_ty) ->
      let (s1, ty1) = ty_exp tyenv exp1 in
      let (s2, ty2) = ty_exp tyenv exp2 in
@@ -519,7 +532,10 @@ let rec ty_exp tyenv = function
      (s3, subst_type s3 ty)
   | _ -> err ("not implemented yet")
 
-let ty_decl tyenv = function
+
+let ty_decl tyenv defenv' rev_defenv' decl =
+  defenv := defenv'; rev_defenv := rev_defenv';
+  match decl with
     Exp e ->
      let stringtyvar_to_inttyvar_list = make_Tyvar_to_TyVar_list e in
      let transformed_e = transform e stringtyvar_to_inttyvar_list in

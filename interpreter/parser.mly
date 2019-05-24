@@ -148,6 +148,8 @@ AExpr :
   | FALSE  { (BLit false, []) }
   | s=STRINGV { (SLit s, []) }
   | i=ID   { (Var i, []) }
+  | c=CNSTR { (Constr (c, None), []) }
+  | c=CNSTR OF e=Expr { (Constr (c, Some e), []) }
   | LBOXBRA RBOXBRA  { (ListExp Emp, []) }
   | e=ListHeadExpr { (ListExp e, []) }
   | LPAREN e=Expr RPAREN { e }
@@ -240,6 +242,8 @@ APattern :
   | FALSE  { (BLit false, []) }
   | s=STRINGV { (SLit s, []) }
   | x=ID { (Var x, []) }
+  | c=CNSTR { (Constr (c, None), []) }
+  | c=CNSTR pt=Pattern { (Constr (c, Some pt), []) }
   | LBOXBRA RBOXBRA { (ListExp Emp, []) }
   | UNDERSCORE { (Wildcard, []) }
   | LPAREN pt=Pattern RPAREN { pt }
@@ -276,8 +280,8 @@ Type :
     t=nonempty_list(VariantType) { t }
 
 VariantType :
-    c=CNSTR { (Constructor (c, None)) }
-  | c=CNSTR OF a=Arg { Constructor (c, Some a) }
+    option(BAR) c=CNSTR { (Constructor (c, None)) }
+  | option(BAR) c=CNSTR OF a=Arg { Constructor (c, Some a) }
 
 Arg :
     t=TupleType { t }

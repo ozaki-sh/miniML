@@ -1,10 +1,11 @@
 open Syntax
 open Eval
 open Typing
+open Define
 
 let debug = ref false
 
-let rec read_eval_print env tyenv=
+let rec read_eval_print env tyenv defenv rev_defenv =
   print_string "# ";
   flush stdout;
   let print_error_and_go s =
@@ -17,44 +18,66 @@ let rec read_eval_print env tyenv=
     if !debug then
       (print_string (Debug.string_of_decl decl);
        print_newline());
-    let tys = ty_decl tyenv decl in
-    let decls = eval_decl env decl in
-    let rec list_process exp_l ty_l env tyenv res_l =
-      match exp_l, ty_l with
-        [], [] -> (env, tyenv, res_l)
-      | ((_, newenv, _) as exp_set :: exp_rest), ((newtyenv, _) as ty_set :: ty_rest) ->
-         list_process exp_rest ty_rest newenv newtyenv ((exp_set, ty_set) :: res_l)
-      | _ -> (env, tyenv, res_l) (* this line cannot be done *)
-    in
-    let (newenv, newtyenv, returned_result_list) = list_process decls tys env tyenv [] in
-    let rec remove_duplication l id_l =
-      match l with
-        [] -> []
-      | ((id, _, _) as exp_h, ty_h) :: rest ->
-         if List.exists (fun x -> x = id) id_l then
-           remove_duplication rest id_l
-         else
-           (exp_h, ty_h) :: (remove_duplication rest (id :: id_l))
-    in
-    let once_list = remove_duplication returned_result_list [] in
-    let rec display l =
-      match l with
-        [] -> read_eval_print newenv newtyenv
-      | ((id, _, v), (_, t)) :: rest ->
-         Printf.printf "val %s : " id;
-         pp_ty t;
-         print_string " = ";
-         pp_val v;
-         print_newline();
-         display rest
-    in
-    display (List.rev once_list)
+    match decl with
+      TypeDecls l ->
+       let (newdefenv, newrev_defenv) = def_decl defenv decl in
+       let rec inner_display l is_first =
+         match l with
+           [] -> ()
+         | (name, body) :: rest ->
+            let pref = if is_first then "type" else "and" in
+            Printf.printf "%s %s = " pref name;
+            pp_def body;
+            print_newline();
+            inner_display rest false
+       and outer_display l =
+         match l with
+           [] -> read_eval_print env tyenv newdefenv newrev_defenv
+         | head :: rest ->
+            inner_display head true;
+            outer_display rest
+       in
+       outer_display l
+    | _ ->
+       let tys = ty_decl tyenv decl in
+       let decls = eval_decl env decl in
+       let rec list_process exp_l ty_l env tyenv res_l =
+         match exp_l, ty_l with
+           [], [] -> (env, tyenv, res_l)
+         | ((_, newenv, _) as exp_set :: exp_rest), ((newtyenv, _) as ty_set :: ty_rest) ->
+            list_process exp_rest ty_rest newenv newtyenv ((exp_set, ty_set) :: res_l)
+         | _ -> (env, tyenv, res_l) (* this line cannot be done *)
+       in
+       let (newenv, newtyenv, returned_result_list) = list_process decls tys env tyenv [] in
+       let rec remove_duplication l id_l =
+         match l with
+           [] -> []
+         | ((id, _, _) as exp_h, ty_h) :: rest ->
+            if List.exists (fun x -> x = id) id_l then
+              remove_duplication rest id_l
+            else
+              (exp_h, ty_h) :: (remove_duplication rest (id :: id_l))
+       in
+       let once_list = remove_duplication returned_result_list [] in
+       let rec display l =
+         match l with
+           [] -> read_eval_print newenv newtyenv defenv rev_defenv
+         | ((id, _, v), (_, t)) :: rest ->
+            Printf.printf "val %s : " id;
+            pp_ty t;
+            print_string " = ";
+            pp_val v;
+            print_newline();
+            display rest
+       in
+       display (List.rev once_list)
   with
     Eval.Error s -> print_error_and_go ("Error! " ^ s)
   | Parser.Error -> print_error_and_go "Syntax Error! at parser"
   | Failure s -> print_error_and_go ("Syntax Error! at " ^ s)
   | Typing.Error s -> print_error_and_go ("Error! " ^ s)
-(* | _ -> print_error_and_go "Error! cause is unknown"*)
+  | Define.Error s -> print_error_and_go ("Error! " ^ s)
+  | _ -> print_error_and_go "Error! cause is unknown"
 
 
 let read_eval_print_from_file env tyenv filename =
@@ -144,7 +167,10 @@ let initial_tyenv =
   Environment.extend "i" (TyScheme ([], TyInt))
     (Environment.extend "v" (TyScheme ([], TyInt))
       (Environment.extend "x" (TyScheme ([], TyInt)) Environment.empty))
-let initial_nameenv = Environment.empty
+
+let initial_defenv = Environment.empty
+
+let initial_rev_defenv = Rev_environment.empty
 
 let _ =
   try

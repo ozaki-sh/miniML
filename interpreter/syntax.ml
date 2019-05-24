@@ -32,6 +32,7 @@ type exp =
   | ILit of int (* ILit 3 --> 3 *)
   | BLit of bool (* BLit true --> true *)
   | SLit of string (* SLit "abc" --> "abc" *)
+  | Constr of id * typedExp option (* Constr "A 1" --> A 1 *)
   | BinOp of binOp * typedExp * typedExp
   (* BinOp(Plus, ILit 4, Var "x") --> 4 + x *)
   | BinLogicOp of binLogicOp * typedExp * typedExp
@@ -122,6 +123,7 @@ let make_tyvar_string_list ty =
        ranty_ts_list
     | TyList ty' -> body_func ty' ts_list
     | TyTuple tytup  -> case_tytuple tytup ts_list
+    | TyUser x -> ts_list
   in
   body_func ty []
 
@@ -155,6 +157,7 @@ let rec string_of_ty ty =
         | TyTuple _  -> "(" ^ (body_func ty) ^ ")" ^ " list"
         | _ -> (body_func ty) ^ " list")
     | TyTuple tytup -> string_of_tytuple tytup
+    | TyUser x -> x
   in
   body_func ty
 
@@ -189,6 +192,7 @@ let rec freevar_ty ty =
   | TyFun (domty, ranty) -> MySet.union (freevar_ty domty) (freevar_ty ranty)
   | TyList ty -> freevar_ty ty
   | TyTuple tytup -> freevar_tytuple tytup
+  | TyUser x -> MySet.empty
 
 let freevar_tysc tysc =
   match tysc with
@@ -196,3 +200,24 @@ let freevar_tysc tysc =
       let freevar_in_ty = freevar_ty ty in
       let boundty = MySet.from_list tyvar_list in
       MySet.diff freevar_in_ty boundty
+
+
+let string_of_def d =
+  match d with
+    Constructor (id, tyop) ->
+     (match tyop with
+        None -> id
+      | Some ty -> id ^ " of " ^ (string_of_ty ty))
+  | Field (id, ty) ->
+     id ^ " : " ^ (string_of_ty ty)
+
+let string_of_defs ds =
+  let strdefs = List.map string_of_def ds in
+  match List.hd ds with
+    Constructor _ ->
+     let str = List.fold_right (fun x y -> x ^ " | " ^ y) strdefs "" in
+     String.sub str 0 (String.length str - 3)
+  | Field _ ->
+     let str = List.fold_right (fun x y -> x ^ " ; " ^ y) strdefs "" in
+     "{ " ^ str ^ " }"
+let pp_defs ds = print_string (string_of_defs ds)

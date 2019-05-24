@@ -17,3 +17,4 @@ let rec fold_right f env a =
       [] -> a
     | (_, v)::rest -> f v (fold_right f rest a)
 
+let member = List.mem_assoc
