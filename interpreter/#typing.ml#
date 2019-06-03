@@ -426,6 +426,8 @@ let rec ty_exp tyenv = function
          | Some exp ->
             let some_l = List.map (fun (Some x, y) -> (x, TyVariant y)) (List.filter (fun (x, y) -> x <> None) l) in
             let (s1, ty1) = ty_exp tyenv exp in
+            let beta = fresh_tyvar () in
+            
             (match some_l with
                [] -> err ("argument not expected: " ^ id)
              | _  ->

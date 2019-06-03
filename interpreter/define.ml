@@ -2,7 +2,7 @@ open Syntax
 
 exception Error of string
 
-let error s = raise (Error s)
+let err s = raise (Error s)
 
 let rec get_TyUser_list ty =
   let rec case_tytuple tytup =
@@ -14,12 +14,12 @@ let rec get_TyUser_list ty =
     TyInt
   | TyBool
   | TyString
-  | TyVar _
   | TyStringVar _ -> MySet.empty
   | TyFun (domty, ranty) -> MySet.union (get_TyUser_list domty) (get_TyUser_list ranty)
   | TyList ty -> get_TyUser_list ty
   | TyTuple tytup -> case_tytuple tytup
   | TyUser x -> MySet.singleton x
+  | _ -> err ("For debug: this error cannot occur")
 
 
 let rec get_ConstrName_and_TyUser_list = function
@@ -36,7 +36,7 @@ let rec get_ConstrName_and_TyUser_list = function
    match l with
      [] -> false
    | head :: rest ->
-      if List.mem head l then true else check_whether_duplication rest
+      if List.mem head rest then true else check_whether_duplication rest
 
 
 let rec check_bound tyuser_l defenv =
@@ -50,8 +50,11 @@ let rec check_bound tyuser_l defenv =
 let rec bind_rev_defenv id l rev_defenv =
   match l with
     [] -> rev_defenv
-  | head :: rest ->
-     let newrev_defenv = Rev_environment.extend head id rev_defenv in
+  | Constructor (name, ty) :: rest ->
+     let newrev_defenv = Rev_environment.extend name (ty, id) rev_defenv in
+     bind_rev_defenv id rest newrev_defenv
+  | Field (name, ty) :: rest ->
+     let newrev_defenv = Rev_environment.extend name (Some ty, id) rev_defenv in
      bind_rev_defenv id rest newrev_defenv
 
 
@@ -69,7 +72,7 @@ let rec def_decl defenv rev_defenv = function
                   then
                     (defenv := defenv'; rev_defenv := rev_defenv')
                   else
-                    err ("Type not bound: " ^ x)
+                    err ("Type not defined: " ^ x)
                | (id, body_l) :: inner_rest ->
                   let (cname_l, tyuser_s) = get_ConstrName_and_TyUser_list body_l in
                   if check_whether_duplication cname_l

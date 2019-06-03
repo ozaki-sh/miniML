@@ -21,6 +21,8 @@ type ty =
   | TyList of ty
   | TyTuple of tytuple
   | TyUser of id
+  | TyVariant of id
+  | TySet of tyvar * ty MySet.t
 and tytuple = TyEmpT | TyConsT of ty * tytuple
 
 (* 型注釈付きのidを表す型 *)
@@ -68,9 +70,11 @@ and tupleExp = EmpT | ConsT of typedExp * tupleExp
 (* 型注釈付きの式を表す型 *)
 and typedExp = exp * ty list
 
+type name = string
+
 type tydecl =
-    Constructor of id * ty option
-  | Field of id * ty
+    Constructor of name * ty option
+  | Field of name * ty
 
 type program =
     Exp of typedExp
@@ -116,7 +120,6 @@ let make_tyvar_string_list ty =
     | TyVar tyvar ->
        if List.mem_assoc tyvar ts_list then ts_list
        else (counter := num + 1; (tyvar, string_of_num num) :: ts_list)
-    | TyStringVar _ -> err  ("For debug: remain string tyvar")
     | TyFun (domty, ranty) ->
        let domty_ts_list = body_func domty ts_list in
        let ranty_ts_list = body_func ranty domty_ts_list in
@@ -124,6 +127,9 @@ let make_tyvar_string_list ty =
     | TyList ty' -> body_func ty' ts_list
     | TyTuple tytup  -> case_tytuple tytup ts_list
     | TyUser x -> ts_list
+    | TyVariant x -> ts_list
+    | TySet _ -> err ("sss")
+    | _ -> err ("For debug: at make_tyvar_string_list")
   in
   body_func ty []
 
@@ -147,7 +153,6 @@ let rec string_of_ty ty =
     | TyBool -> "bool"
     | TyString -> "string"
     | TyVar tyvar -> List.assoc tyvar tyvar_string_list
-    | TyStringVar _ -> err ("For debug: remain string tyvar")
     | TyFun (TyFun (_, _) as domty, ranty) -> "(" ^ (body_func domty) ^ ")" ^
                                                 " -> " ^ (body_func ranty)
     | TyFun (domty, ranty) -> (body_func domty) ^ " -> " ^ (body_func ranty)
@@ -158,6 +163,8 @@ let rec string_of_ty ty =
         | _ -> (body_func ty) ^ " list")
     | TyTuple tytup -> string_of_tytuple tytup
     | TyUser x -> x
+    | TyVariant x -> x
+    | _ -> err ("For debug: at string_of_ty")
   in
   body_func ty
 
@@ -188,11 +195,12 @@ let rec freevar_ty ty =
   | TyBool
   | TyString -> MySet.empty
   | TyVar tyvar -> MySet.singleton tyvar
-  | TyStringVar _ -> err ("For debug: remain string tyvar")
   | TyFun (domty, ranty) -> MySet.union (freevar_ty domty) (freevar_ty ranty)
   | TyList ty -> freevar_ty ty
   | TyTuple tytup -> freevar_tytuple tytup
-  | TyUser x -> MySet.empty
+  | TyVariant x -> MySet.empty
+  | TySet _ -> MySet.empty
+  | _ -> err ("For debug: at freevar_ty")
 
 let freevar_tysc tysc =
   match tysc with

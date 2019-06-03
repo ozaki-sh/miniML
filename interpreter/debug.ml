@@ -39,6 +39,10 @@ and string_of_exp = function
   | ILit i -> "ILit " ^ (string_of_int i)
   | BLit b -> "BLit " ^ (string_of_bool b)
   | SLit s -> "SLit " ^ s
+  | Constr (id, expop) ->
+     (match expop with
+        None -> "Constr (" ^ id ^ ", None)"
+      | Some (exp, _) -> "Constr (" ^ id ^ ", " ^ (string_of_exp exp) ^ ")")
   | BinOp (op, (exp1, _), (exp2, _)) ->
      "BinOp " ^ (string_of_binOp op) ^
        " (" ^ (string_of_exp exp1) ^ "), (" ^ (string_of_exp exp2) ^ ")"
@@ -67,6 +71,57 @@ and string_of_exp = function
      "TupleExp " ^ (string_of_tupleExp texp)
   | Wildcard -> "Wildcard"
 
+let rec string_of_tyrow = function
+    TyInt -> "TyInt"
+  | TyBool -> "TyBool"
+  | TyString -> "TyString"
+  | TyVar tyvar -> "TyVar " ^ (string_of_int tyvar)
+  | TyStringVar tyvar -> "TyStringVar " ^ tyvar
+  | TyFun (domty, ranty) -> "TyFun (" ^ (string_of_tyrow domty) ^ ", " ^ (string_of_tyrow ranty) ^ ")"
+  | TyList ty -> "TyList " ^ (string_of_tyrow ty)
+  | TyTuple tytup -> "TyTuple "
+  | TyUser id -> "TyUser " ^ id
+  | TyVariant id -> "TyVariant " ^ id
+  | TySet (tyvar, l) -> "TySet (" ^ (string_of_int tyvar) ^ ", " ^ List.fold_left (fun x y -> x ^ "; " ^ y) "" ((List.map (fun x -> string_of_tyrow x) (MySet.to_list l)))
+
+let rec string_of_tydecl = function
+    Constructor (name, None) -> name
+  | Constructor (name, Some ty) -> name ^ " of " ^ string_of_ty ty
+  | Field (name, ty) -> name ^ " : " ^ string_of_ty ty
+
 let string_of_decl = function
     Exp (exp, _) -> string_of_exp exp
-  | _ -> ""
+  | Decls l ->
+     List.fold_left
+       (fun x y ->
+         x ^ (List.fold_left
+                (fun s t -> s ^ t ^ "\n")
+                ""
+                (List.map (fun ((id, _), (exp, _)) -> id ^ " ::= " ^ string_of_exp exp) y)) ^ "\n")
+       ""
+       l
+  | RecDecls l ->
+     List.fold_left
+       (fun x y ->
+         x ^ (List.fold_left
+                (fun s t -> s ^ t ^ "\n")
+                ""
+                (List.map (fun ((id, _), (exp, _)) -> id ^ " ::= " ^ string_of_exp exp) y)) ^ "\n")
+       ""
+       l
+  | TypeDecls l ->
+     List.fold_left
+       (fun x y ->
+         x ^ (List.fold_left
+                (fun s t -> s ^ t ^ "\n")
+                ""
+                (List.map (fun (id, tydecl) -> id ^ " <-def-> " ^ string_of_defs tydecl) y)) ^ "\n")
+       ""
+       l
+
+
+let rec string_of_subst s =
+  List.fold_left
+    (fun x y -> x ^ "; " ^ y)
+    ""
+    (List.map (fun (tyvar, ty) -> "(" ^ (string_of_int tyvar) ^ ", " ^ (string_of_tyrow ty) ^ ")") s)

@@ -114,6 +114,7 @@ let rec apply_prim op arg1 arg2 =
   | Eq, IntV i1, IntV i2 -> BoolV (i1 = i2)
   | Eq, BoolV b1, BoolV b2 -> BoolV (b1 = b2)
   | Eq, StringV s1, StringV s2 -> BoolV (s1 = s2)
+  | Eq, _, _ -> err ("= accepts int bool string only")
   | Cons, _, ListV l -> ListV (ConsV (arg1, l))
   | Hat, StringV s1, StringV s2 -> StringV (s1 ^ s2)
   | Expo, IntV i1, IntV i2 ->

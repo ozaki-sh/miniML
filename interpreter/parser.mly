@@ -149,7 +149,7 @@ AExpr :
   | s=STRINGV { (SLit s, []) }
   | i=ID   { (Var i, []) }
   | c=CNSTR { (Constr (c, None), []) }
-  | c=CNSTR OF e=Expr { (Constr (c, Some e), []) }
+  | c=CNSTR e=Expr { (Constr (c, Some e), []) }
   | LBOXBRA RBOXBRA  { (ListExp Emp, []) }
   | e=ListHeadExpr { (ListExp e, []) }
   | LPAREN e=Expr RPAREN { e }
