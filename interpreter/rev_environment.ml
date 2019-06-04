@@ -1,4 +1,4 @@
-type t = (Syntax.name * (Syntax.ty option * Syntax.id)) list
+type t = (Syntax.name * (Syntax.ty * Syntax.id)) list
 
 exception Not_bound
 

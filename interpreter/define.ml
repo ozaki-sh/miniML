@@ -19,7 +19,8 @@ let rec get_TyUser_list ty =
   | TyList ty -> get_TyUser_list ty
   | TyTuple tytup -> case_tytuple tytup
   | TyUser x -> MySet.singleton x
-  | _ -> err ("For debug: this error cannot occur")
+  | TyNone _  -> MySet.empty
+  | _ -> err ("For debug: at get_TyUser_list")
 
 
 let rec get_ConstrName_and_TyUser_list = function
@@ -27,8 +28,7 @@ let rec get_ConstrName_and_TyUser_list = function
   | head :: rest ->
      let (cname_l, tyuser_s) = get_ConstrName_and_TyUser_list rest in
      (match head with
-        Constructor (id, Some ty) -> (id :: cname_l, MySet.union (get_TyUser_list ty) tyuser_s)
-      | Constructor (id, _) -> (id :: cname_l, tyuser_s)
+        Constructor (id,ty) -> (id :: cname_l, MySet.union (get_TyUser_list ty) tyuser_s)
       | Field (id, ty) -> (id :: cname_l, MySet.union (get_TyUser_list ty) tyuser_s))
 
 
@@ -54,7 +54,7 @@ let rec bind_rev_defenv id l rev_defenv =
      let newrev_defenv = Rev_environment.extend name (ty, id) rev_defenv in
      bind_rev_defenv id rest newrev_defenv
   | Field (name, ty) :: rest ->
-     let newrev_defenv = Rev_environment.extend name (Some ty, id) rev_defenv in
+     let newrev_defenv = Rev_environment.extend name (ty, id) rev_defenv in
      bind_rev_defenv id rest newrev_defenv
 
 

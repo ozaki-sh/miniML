@@ -11,6 +11,8 @@ type binLogicOp = And | Or
 
 type tyvar = int
 
+type name = string
+
 type ty =
     TyInt
   | TyBool
@@ -22,19 +24,19 @@ type ty =
   | TyTuple of tytuple
   | TyUser of id
   | TyVariant of id
+  | TyNone of name
   | TySet of tyvar * ty MySet.t
 and tytuple = TyEmpT | TyConsT of ty * tytuple
 
 (* 型注釈付きのidを表す型 *)
 type typedId = id * ty list
 
-
 type exp =
   | Var of id (* Var "x" --> x *)
   | ILit of int (* ILit 3 --> 3 *)
   | BLit of bool (* BLit true --> true *)
   | SLit of string (* SLit "abc" --> "abc" *)
-  | Constr of id * typedExp option (* Constr "A 1" --> A 1 *)
+  | Constr of name * typedExp option (* Constr "A 1" --> A 1 *)
   | BinOp of binOp * typedExp * typedExp
   (* BinOp(Plus, ILit 4, Var "x") --> 4 + x *)
   | BinLogicOp of binLogicOp * typedExp * typedExp
@@ -70,10 +72,8 @@ and tupleExp = EmpT | ConsT of typedExp * tupleExp
 (* 型注釈付きの式を表す型 *)
 and typedExp = exp * ty list
 
-type name = string
-
 type tydecl =
-    Constructor of name * ty option
+    Constructor of name * ty
   | Field of name * ty
 
 type program =
@@ -199,6 +199,7 @@ let rec freevar_ty ty =
   | TyList ty -> freevar_ty ty
   | TyTuple tytup -> freevar_tytuple tytup
   | TyVariant x -> MySet.empty
+  | TyNone _ -> MySet.empty
   | TySet _ -> MySet.empty
   | _ -> err ("For debug: at freevar_ty")
 
@@ -212,10 +213,10 @@ let freevar_tysc tysc =
 
 let string_of_def d =
   match d with
-    Constructor (id, tyop) ->
-     (match tyop with
-        None -> id
-      | Some ty -> id ^ " of " ^ (string_of_ty ty))
+    Constructor (id, ty) ->
+     (match ty with
+        TyNone _ -> id
+      | _ -> id ^ " of " ^ (string_of_ty ty))
   | Field (id, ty) ->
      id ^ " : " ^ (string_of_ty ty)
 

@@ -280,8 +280,8 @@ Type :
     t=nonempty_list(VariantType) { t }
 
 VariantType :
-    option(BAR) c=CNSTR { (Constructor (c, None)) }
-  | option(BAR) c=CNSTR OF a=Arg { Constructor (c, Some a) }
+    option(BAR) c=CNSTR { (Constructor (c, TyNone c)) }
+  | option(BAR) c=CNSTR OF a=Arg { Constructor (c, a) }
 
 Arg :
     t=TupleType { t }

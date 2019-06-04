@@ -82,12 +82,12 @@ let rec string_of_tyrow = function
   | TyTuple tytup -> "TyTuple "
   | TyUser id -> "TyUser " ^ id
   | TyVariant id -> "TyVariant " ^ id
+  | TyNone _ -> "TyNone"
   | TySet (tyvar, l) -> "TySet (" ^ (string_of_int tyvar) ^ ", " ^ List.fold_left (fun x y -> x ^ "; " ^ y) "" ((List.map (fun x -> string_of_tyrow x) (MySet.to_list l)))
 
 let rec string_of_tydecl = function
-    Constructor (name, None) -> name
-  | Constructor (name, Some ty) -> name ^ " of " ^ string_of_ty ty
-  | Field (name, ty) -> name ^ " : " ^ string_of_ty ty
+    Constructor (name, ty) -> name ^ " of " ^ string_of_tyrow ty
+  | Field (name, ty) -> name ^ " : " ^ string_of_tyrow ty
 
 let string_of_decl = function
     Exp (exp, _) -> string_of_exp exp

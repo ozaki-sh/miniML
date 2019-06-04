@@ -23,6 +23,7 @@ let rec subst_type (subst : subst) t =
     | TyFun (domty, ranty) -> TyFun (subst_one_type (tv, ty) domty, subst_one_type (tv, ty) ranty)
     | TyList ty' -> TyList (subst_one_type (tv, ty) ty')
     | TyTuple tytup -> TyTuple (subst_tytuple (tv, ty) tytup)
+    | TySet (tv', l) when tv = tv' -> ty
     | _ -> t
   in
   match subst with
@@ -59,6 +60,9 @@ let rec unify eqs =
       | _, TyVar alpha ->
          if MySet.member alpha (freevar_ty ty1) then raise TypeError
          else (alpha, ty1) :: unify (subst_eqs [(alpha, ty1)] rest)
+      | TyNone _, TyNone _ -> unify rest
+      | TyNone name, _ -> err ("arguments not expected: " ^ name)
+      | _, TyNone name -> err ("arguments expected: " ^ name)
       | TySet (alpha, l1), TySet (beta, l2) ->
          let l = MySet.intersection l1 l2 in
          (match (MySet.to_list l) with
@@ -73,6 +77,15 @@ let rec unify eqs =
       | _, TySet (alpha, l2) ->
          if MySet.member ty1 l2 then (alpha, ty1) :: unify (subst_eqs [(alpha, ty1)] rest) else raise TypeError
       | _ -> raise TypeError)
+
+let rec reflect_dependency dependent_relation (s : subst) =
+  match s with
+    [] -> []
+  | (tyvar, ty) :: rest ->
+     (try
+        (List.assoc (tyvar, ty) dependent_relation) :: reflect_dependency dependent_relation rest
+      with
+        Not_found -> reflect_dependency dependent_relation rest)
 
 let squeeze_subst (s : subst) =
   let rec squeeze ty_list ty =
@@ -102,6 +115,21 @@ let squeeze_subst (s : subst) =
   let (tyvar_list, _) = List.split s in
   let tyvar_set = MySet.to_list (MySet.from_list tyvar_list) in
   body_func tyvar_set
+
+let rec delete_TySet ty =
+  let rec case_tytuple tytup =
+    match tytup with
+      TyEmpT -> TyEmpT
+    | TyConsT (ty', tytup') -> TyConsT (delete_TySet ty', case_tytuple tytup')
+  in
+  match ty with
+    TySet (_, l) -> List.hd (MySet.to_list l)
+  | TyList ty -> TyList (delete_TySet ty)
+  | TyTuple tytup -> TyTuple (case_tytuple tytup)
+  | _ -> ty
+
+let finalize_subst (s: subst) =
+  List.map (fun (x, y) -> (x, delete_TySet y)) s
 
 let rec freevar_tyenv (tyenv : tyenv) =
   Environment.fold_right (fun x y -> MySet.union (freevar_tysc x) y) tyenv MySet.empty
@@ -223,7 +251,7 @@ let rec get_attached_tyvar_list = function
   | TyTuple TyEmpT -> []
   | TyTuple (TyConsT (ty, tytup)) -> (get_attached_tyvar_list ty) @ (get_attached_tyvar_list (TyTuple tytup))
   | TyUser _ -> []
-  | _ -> err ("For debug : this error cannot occur (get_attached_tyvar_list)")
+  | _ -> err ("For debug : at get_attached_tyvar_list")
 
 (* attached_tyの型変数とtyの型変数の対応表を作る *)
 let make_Tyvar_to_TyVar_list exp =
@@ -234,7 +262,7 @@ let make_Tyvar_to_TyVar_list exp =
          TyStringVar tyvar ->
           if List.exists (fun x -> x = tyvar) used_list then main_loop used_list rest
           else (tyvar, (fresh_tyvar ())) :: main_loop (tyvar :: used_list) rest
-       | _ -> err ("For debug : this error cannot occur (make_Tyvar_to_tyvar_list)")
+       | _ -> err ("For debug : at make_Tyvar_to_tyvar_list")
   in
   (* 式中の型注釈に使われている型を集めて *)
   let attached_ty_list = get_attached_ty_list exp in
@@ -251,7 +279,7 @@ let make_Tyvar_to_TyVar_list_for_decl decl =
          TyStringVar tyvar ->
           if List.exists (fun x -> x = tyvar) used_list then main_loop used_list rest
           else (tyvar, (fresh_tyvar ())) :: main_loop (tyvar :: used_list) rest
-       | _ -> err ("For debug : this error cannot occur (make_Tyvar_to_tyvar_list_for_decl)")
+       | _ -> err ("For debug : at make_Tyvar_to_tyvar_list_for_decl")
   in
   let attached_ty_list = get_attached_ty_list_from_decl decl in
   let attached_tyvar_list = List.concat (List.map (get_attached_tyvar_list) attached_ty_list) in
@@ -276,7 +304,7 @@ let rec transform exp_with_ty stv_to_itv_list =
            | Field _ -> TyInt (* should be changed *))
         with
           Environment.Not_bound -> err ("type not defined: " ^ x))
-    | _ -> err ("For debug : this error cannot occur")
+    | _ -> err ("For debug : at transform_att_ty")
   and transform_att_tytuple = function
       TyEmpT -> TyEmpT
     | TyConsT (ty, tytup) -> TyConsT (transform_att_ty ty, transform_att_tytuple tytup)
@@ -343,7 +371,7 @@ let rec transform_decl decl stv_to_itv_list =
            | Field _ -> TyInt (* should be changed *))
         with
           Environment.Not_bound -> err ("type not defined: " ^ x))
-    | _ -> err ("For debug : this error cannot occur (transform_decl)")
+    | _ -> err ("For debug : at transform_decl")
   and transform_att_ty_list = function
       [] -> []
     | attached_ty :: rest -> (transform_att_ty attached_ty) :: transform_att_ty_list rest
@@ -385,132 +413,111 @@ let rec ty_exp tyenv = function
         let s1 = List.map (fun id -> (id, TyVar (fresh_tyvar ()))) vars in
         let ty' = subst_type s1 ty in
         let eqs = make_eqs_about_att_ty ty' att_ty in
-        let s2 = squeeze_subst (unify eqs) in
-        (s2, subst_type s2 ty')
+        let s2 = unify eqs in
+        (s2, subst_type s2 ty', [])
       with Environment.Not_bound -> err ("variable not bound: " ^ x))
   | (ILit _, att_ty) ->
      let eqs = make_eqs_about_att_ty TyInt att_ty in
-     let s = squeeze_subst (unify eqs) in
-     (s, TyInt)
+     let s = unify eqs in
+     (s, TyInt, [])
   | (BLit _, att_ty) ->
      let eqs = make_eqs_about_att_ty TyBool att_ty in
-     let s = squeeze_subst (unify eqs) in
-     (s, TyBool)
+     let s =unify eqs in
+     (s, TyBool, [])
   | (SLit _, att_ty) ->
      let eqs = make_eqs_about_att_ty TyString att_ty in
-     let s = squeeze_subst (unify eqs) in
-     (s, TyString)
-  | (Constr (id, expop), att_ty) ->
-     let rec special_unify l1 l2 =
-       match l1 with
+     let s = unify eqs in
+     (s, TyString, [])
+  | (Constr (name, expop), att_ty) ->
+     let rec make_dependent_relation alpha beta l =
+       match l with
          [] -> []
-       | (h1, h2) :: rest ->
-          if List.mem h1 l2 then (h1, h2) :: special_unify rest l2
-          else special_unify rest l2
+       | (arg_ty, this_ty) :: rest ->
+          ((alpha, this_ty), (beta, arg_ty)) :: make_dependent_relation alpha beta rest
      in
      (try
-        let l = Rev_environment.lookup id !rev_defenv in
-        (match expop with
-           None ->
-            let none_l = List.map (fun (x, y) -> TyVariant y) (List.filter (fun (x, y) -> x = None) l) in
-            (match none_l with
-               [] -> err ("argument expected: " ^ id)
-             | _ ->
-                let alpha = fresh_tyvar () in
-                let ty =
-                  if List.length none_l = 1 then List.hd none_l
-                  else TySet (alpha, MySet.from_list none_l) in
-                let eqs = (TyVar alpha, ty) :: make_eqs_about_att_ty ty att_ty in
-                let s = squeeze_subst (unify eqs) in
-                (s, subst_type s (TyVar alpha)))
-         | Some exp ->
-            let some_l = List.map (fun (Some x, y) -> (x, TyVariant y)) (List.filter (fun (x, y) -> x <> None) l) in
-            let (s1, ty1) = ty_exp tyenv exp in
-            (match some_l with
-               [] -> err ("argument not expected: " ^ id)
-             | _  ->
-                let arg_l =
-                  match ty1 with
-                    TySet (_, l') -> MySet.to_list l'
-                  | ty -> [ty] in
-                let arg_this_list = special_unify some_l arg_l in
-                let (_, ty2) = List.split arg_this_list in
-                let alpha = fresh_tyvar () in
-                let ty3 =
-                  match ty2 with
-                    [] -> err ("Type Error")
-                  | _ ->
-                     if List.length ty2 = 1 then List.hd ty2
-                     else TySet (alpha, MySet.from_list ty2) in
-                let eqs = (TyVar alpha, ty3) :: make_eqs_about_att_ty ty3 att_ty in
-                let s2 = squeeze_subst (unify eqs) in
-                (s2, subst_type s2 (TyVar alpha))))
+        let l = List.map (fun (x, y) -> (x, TyVariant y)) (Rev_environment.lookup name !rev_defenv) in
+        let (arg_ty_l, this_ty_l) = List.split l in
+        let (s1, arg_ty, arg_rel) =
+          match expop with
+            None -> ([], TyNone name, [])
+          | Some exp -> ty_exp tyenv exp in
+        let alpha = fresh_tyvar () in
+        let beta = fresh_tyvar () in
+        let rel = make_dependent_relation alpha beta l in
+        let (arg_eqs, this_eqs) =
+          if List.length l = 1 then
+            ([(TyVar beta, List.hd arg_ty_l); (TyVar beta, arg_ty)], [(TyVar alpha, List.hd this_ty_l)])
+          else
+            ([(TyVar beta, TySet (beta, MySet.from_list arg_ty_l)); (TyVar beta, arg_ty)], [(TyVar alpha, TySet (alpha, MySet.from_list this_ty_l))]) in
+        let s2 = squeeze_subst (unify ((eqs_of_subst s1) @ arg_eqs @ this_eqs @ make_eqs_about_att_ty (TyVar alpha) att_ty)) in
+        (s2, subst_type s2 (TyVar alpha), rel @ arg_rel)
       with
-        Rev_environment. Not_bound -> err ("constructor not bound: " ^ id))
+        Rev_environment.Not_bound -> err ("constructor not bound: " ^ name))
   | (BinOp (op, exp1, exp2), att_ty) ->
-     let (s1, ty1) = ty_exp tyenv exp1 in
-     let (s2, ty2) = ty_exp tyenv exp2 in
+     let (s1, ty1, rel1) = ty_exp tyenv exp1 in
+     let (s2, ty2, rel2) = ty_exp tyenv exp2 in
      let (eqs3, ty) =  ty_prim op ty1 ty2 in
      let eqs = (eqs_of_subst s1) @ (eqs_of_subst s2) @ eqs3 @ (make_eqs_about_att_ty ty att_ty) in
      let s3 = squeeze_subst (unify eqs) in
-     (s3, subst_type s3 ty)
+     (s3, subst_type s3 ty, rel1 @ rel2)
   | (BinLogicOp (op, exp1, exp2), att_ty) ->
-     let (s1, ty1) = ty_exp tyenv exp1 in
-     let (s2, ty2) = ty_exp tyenv exp2 in
+     let (s1, ty1, rel1) = ty_exp tyenv exp1 in
+     let (s2, ty2, rel2) = ty_exp tyenv exp2 in
      let (eqs3, ty) =  ty_logic_prim op ty1 ty2 in
      let eqs = (eqs_of_subst s1) @ (eqs_of_subst s2) @ eqs3 @ (make_eqs_about_att_ty ty att_ty) in
      let s3 = squeeze_subst (unify eqs) in
-     (s3, subst_type s3 ty)
+     (s3, subst_type s3 ty, rel1 @ rel2)
   | (IfExp (exp1, exp2, exp3), att_ty) ->
-     let (s1, ty1) = ty_exp tyenv exp1 in
-     let (s2, ty2) = ty_exp tyenv exp2 in
-     let (s3, ty3) = ty_exp tyenv exp3 in
+     let (s1, ty1, rel1) = ty_exp tyenv exp1 in
+     let (s2, ty2, rel2) = ty_exp tyenv exp2 in
+     let (s3, ty3, rel3) = ty_exp tyenv exp3 in
      let eqs = (eqs_of_subst s1) @ (eqs_of_subst s2) @ (eqs_of_subst s3) @ [(ty1, TyBool); (ty2, ty3)]
                @ (make_eqs_about_att_ty ty2 att_ty) in
      let s4 = squeeze_subst (unify eqs) in
-     (s4, subst_type s4 ty2)
+     (s4, subst_type s4 ty2, rel1 @ rel2 @ rel3)
   | (LetExp (l, exp2), att_ty) ->
-     let rec ty_let_list l tyenv' subst id_l =
+     let rec ty_let_list l tyenv' subst id_l rel =
        match l with
          [] ->
-          let (s3, ty2) = ty_exp tyenv' exp2 in
+          let (s3, ty2, rel2) = ty_exp tyenv' exp2 in
           let eqs = (eqs_of_subst subst) @ (eqs_of_subst s3) @ (make_eqs_about_att_ty ty2 att_ty) in
-          let s4 = unify eqs in
-          (s4, subst_type s4 ty2)
+          let s4 = squeeze_subst (unify eqs) in
+          (s4, subst_type s4 ty2, rel2 @ rel)
        | ((id, att_ty'), exp1) :: rest ->
           if List.exists (fun x -> x = id) id_l then
             err ("one variable is bound several times in this expression")
           else
-            let (s1, ty1) = ty_exp tyenv exp1 in
+            let (s1, ty1, rel1) = ty_exp tyenv exp1 in
             let eqs = (eqs_of_subst s1) @ (make_eqs_about_att_ty ty1 att_ty') in
             let s2 = squeeze_subst (unify eqs) in
             let tysc = closure ty1 tyenv s2 in
             let newtyenv = Environment.extend id tysc tyenv' in
-            ty_let_list rest newtyenv (s2 @ subst) (id :: id_l)
+            ty_let_list rest newtyenv (s2 @ subst) (id :: id_l) (rel1 @ rel)
      in
-     ty_let_list l tyenv [] []
+     ty_let_list l tyenv [] [] []
   | (FunExp ((id, att_ty'), exp), att_ty) ->
      let domty = TyVar (fresh_tyvar ()) in
-     let (s1, ranty) = ty_exp (Environment.extend id (TyScheme ([], domty)) tyenv) exp in
+     let (s1, ranty, rel) = ty_exp (Environment.extend id (TyScheme ([], domty)) tyenv) exp in
      let ty = TyFun (subst_type s1 domty, ranty) in
      let eqs = (eqs_of_subst s1) @ (make_eqs_about_att_ty (subst_type s1 domty) att_ty') @ (make_eqs_about_att_ty ty att_ty) in
      let s2 = squeeze_subst (unify eqs) in
-     (s2, subst_type s2 ty)
+     (s2, subst_type s2 ty, rel)
   | (AppExp (exp1, exp2), att_ty) ->
-     let (s1, ty1) = ty_exp tyenv exp1 in
-     let (s2, ty2) = ty_exp tyenv exp2 in
+     let (s1, ty1, rel1) = ty_exp tyenv exp1 in
+     let (s2, ty2, rel2) = ty_exp tyenv exp2 in
      (match ty1 with
         TyFun (domty, ranty) ->
          let eqs = (eqs_of_subst s1) @ (eqs_of_subst s2) @ [(domty, ty2)] @ (make_eqs_about_att_ty ranty att_ty) in
          let s3 = squeeze_subst (unify eqs) in
-         (s3, subst_type s3 ranty)
+         (s3, subst_type s3 ranty, rel1 @ rel2)
       | TyVar _  ->
          let domty = TyVar (fresh_tyvar ()) in
          let ranty = TyVar (fresh_tyvar ()) in
          let eqs = (eqs_of_subst s1) @ (eqs_of_subst s2) @ [(ty1, TyFun (domty, ranty)); (domty, ty2)]
                    @ (make_eqs_about_att_ty ranty att_ty) in
          let s3 = squeeze_subst (unify eqs) in
-         (s3, subst_type s3 ranty)
+         (s3, subst_type s3 ranty, rel1 @ rel2)
       | _ -> err ("Non-function value is applied"))
   | (LetRecExp (l, exp2), att_ty) ->
      let rec main_loop l tyenv' exp_dom_ran_l id_l =
@@ -520,12 +527,12 @@ let rec ty_exp tyenv = function
           let rec make_eqs_list = function
               [] -> []
             | ((FunExp ((para, att_ty1), exp), att_ty2), domty, ranty) :: rest ->
-               let (s, t) = ty_exp (Environment.extend para (TyScheme ([], domty)) tyenv') exp in
-               (eqs_of_subst s) :: [(t, ranty)] :: (make_eqs_about_att_ty (TyFun (domty, ranty)) att_ty2)
-               :: (make_eqs_about_att_ty (subst_type s domty) att_ty1) :: make_eqs_list rest
+               let (s, t, rel) = ty_exp (Environment.extend para (TyScheme ([], domty)) tyenv') exp in
+               ((eqs_of_subst s) :: [(t, ranty)] :: (make_eqs_about_att_ty (TyFun (domty, ranty)) att_ty2)
+               :: [make_eqs_about_att_ty (subst_type s domty) att_ty1], rel) :: make_eqs_list rest
             | _ -> err ("For debug : this error cannot occur")
           in
-          let eqs_list = List.concat (make_eqs_list exp_dom_ran_l) in
+          let (eqs_list, rel1) = (fun (x, y) -> (List.concat (List.concat x), List.concat y)) (List.split (make_eqs_list exp_dom_ran_l)) in
           (* 本当に束縛すべき値を変数に束縛する *)
           let rec make_newtyenv id_l =
             match id_l with
@@ -539,10 +546,10 @@ let rec ty_exp tyenv = function
                Environment.extend id tysc (make_newtyenv rest)
           in
           let newtyenv = make_newtyenv id_l in
-          let (s2, ty2) = ty_exp newtyenv exp2 in
+          let (s2, ty2, rel2) = ty_exp newtyenv exp2 in
           let eqs = eqs_list @ (eqs_of_subst s2) @ (make_eqs_about_att_ty ty2 att_ty) in
           let s3 = squeeze_subst (unify eqs) in
-          (s3, subst_type s3 ty2)
+          (s3, subst_type s3 ty2, rel1 @ rel2)
        (* まず変数が適当な関数に束縛されているようにする *)
        | (typed_id, exp) :: rest ->
           let (id, _) = typed_id in
@@ -561,10 +568,10 @@ let rec ty_exp tyenv = function
          let ty = TyList (TyVar (fresh_tyvar ())) in
          let eqs = make_eqs_about_att_ty ty att_ty in
          let s = squeeze_subst (unify eqs) in
-         (s, subst_type s ty)
+         (s, subst_type s ty, [])
       | Cons (exp, l) ->
-         let (s1, ty1) = ty_exp tyenv exp in
-         let (s2, ty2') = ty_exp tyenv ((ListExp l), []) in
+         let (s1, ty1, rel1) = ty_exp tyenv exp in
+         let (s2, ty2', rel2) = ty_exp tyenv ((ListExp l), []) in
          match ty2' with
            TyList ty2 ->
             let eqs1 = (eqs_of_subst s1) @ (eqs_of_subst s2) @ [(ty2, ty1)] in
@@ -572,10 +579,10 @@ let rec ty_exp tyenv = function
             let ty3 = TyList (subst_type s3 ty1) in
             let eqs2 = (eqs_of_subst s3) @ (make_eqs_about_att_ty ty3 att_ty) in
             let s4 = squeeze_subst (unify eqs2) in
-            (s4, subst_type s4 ty3)
+            (s4, subst_type s4 ty3, rel1 @ rel2)
          | _ -> err ("For debug : this error cannot occur"))
   | (MatchExp (exp, pattern_and_body_list), att_ty) ->
-     let (s1, ty) = ty_exp tyenv exp in
+     let (s1, ty, rel) = ty_exp tyenv exp in
      let eqs1 = eqs_of_subst s1 in
      (* 各パターン列を評価 *)
      let rec main_loop = function
@@ -586,7 +593,7 @@ let rec ty_exp tyenv = function
             err ("one variable is bound several times in this expression")
           else
             let newtyenv = bind_and_return_tyenv tyenv id_and_ty_list in
-            let (subst, ty) = ty_exp newtyenv body in
+            let (subst, ty, rel) = ty_exp newtyenv body in
             let (subst_ty_list, eqs_list) = main_loop rest in
             ((subst @ subst_list, ty) :: subst_ty_list, eqs :: eqs_list)
      (* 同一パターン列の中に同じ変数が現れてないかをチェック *)
@@ -615,23 +622,23 @@ let rec ty_exp tyenv = function
      let ty = subst_type s3 (List.hd tys) in
      let eqs6 = (eqs_of_subst s3) @ (make_eqs_about_att_ty ty att_ty) in
      let s4 = squeeze_subst (unify eqs6) in
-     (s4, subst_type s4 ty)
+     (s4, subst_type s4 ty, [])
   | (TupleExp l, att_ty) ->
-     let rec ty_tupleExp l subst =
+     let rec ty_tupleExp l subst relation =
        match l with
-         EmpT -> (subst, TyEmpT)
+         EmpT -> (subst, TyEmpT, relation)
        | ConsT (exp, l') ->
-          let (s, ty) = ty_exp tyenv exp in
-          let (subst', tytuple) = ty_tupleExp l' subst in
-          ((s @ subst'), TyConsT (ty, tytuple))
+          let (s, ty, rel) = ty_exp tyenv exp in
+          let (subst', tytuple, relation') = ty_tupleExp l' subst rel in
+          ((s @ subst'), TyConsT (ty, tytuple), (rel @ relation'))
      in
-     let (s1, tytuple) = ty_tupleExp l [] in
+     let (s1, tytuple, rel) = ty_tupleExp l [] [] in
      let eqs1 = eqs_of_subst s1 in
      let s2 = squeeze_subst (unify eqs1) in
      let ty = subst_type s2 (TyTuple tytuple) in
      let eqs2 = (eqs_of_subst s2) @ (make_eqs_about_att_ty ty att_ty) in
      let s3 = squeeze_subst (unify eqs2) in
-     (s3, subst_type s3 ty)
+     (s3, subst_type s3 ty, rel)
   | _ -> err ("not implemented yet")
 
 
@@ -641,10 +648,10 @@ let ty_decl tyenv defenv' rev_defenv' decl =
     Exp e ->
      let stringtyvar_to_inttyvar_list = make_Tyvar_to_TyVar_list e in
      let transformed_e = transform e stringtyvar_to_inttyvar_list in
-     let (_, ty) = ty_exp tyenv transformed_e in
-     (match ty with
-        TySet (_, l) ->[(tyenv, List.hd (MySet.to_list l))]
-       | _ -> [(tyenv, ty)])
+     let (s1, ty, rel) = ty_exp tyenv transformed_e in
+     let s2 = finalize_subst s1 in
+     let s3 = unify (eqs_of_subst (s2 @ reflect_dependency rel s2)) in
+     [(tyenv, subst_type s3 ty)]
   | Decls l ->
      let rec make_decl_ty_list l tyenv =
        match l with
@@ -658,18 +665,14 @@ let ty_decl tyenv defenv' rev_defenv' decl =
                 if List.exists (fun x -> x = id) id_l then
                   err ("one variable is bound several times in this declaration")
                 else
-                  let (s1, ty) = ty_exp !tyenv e in
+                  let (s1, ty, rel) = ty_exp !tyenv e in
                   let eqs = (eqs_of_subst s1) @ (make_eqs_about_att_ty ty att_ty) in
                   let s2 = squeeze_subst (unify eqs) in
-                  let (s3, ty') =
-                    match ty with
-                      TySet (alpha, l) ->
-                       let chosen_ty = List.hd (MySet.to_list l) in
-                       (squeeze_subst ((alpha, chosen_ty) :: s2), chosen_ty)
-                    | _ -> (s2, ty) in
-                  let tysc = closure ty' !tyenv s3 in
+                  let s3 = finalize_subst s2 in
+                  let s4 = finalize_subst (squeeze_subst (unify (eqs_of_subst ((reflect_dependency rel s3) @ s2)))) in
+                  let tysc = closure (subst_type s4 ty) !tyenv s4 in
                   let newtyenv = Environment.extend id tysc tyenv' in
-                  (newtyenv, subst_type s3 ty') :: make_anddecl_ty_list inner_rest newtyenv (id :: id_l))
+                  (newtyenv, subst_type s4 (subst_type s4 ty)) :: make_anddecl_ty_list inner_rest newtyenv (id :: id_l))
           in
           let stringtyvar_to_inttyvar_list = make_Tyvar_to_TyVar_list_for_decl head in
           let transformed_head = transform_decl head stringtyvar_to_inttyvar_list in
@@ -689,33 +692,29 @@ let ty_decl tyenv defenv' rev_defenv' decl =
                  let rec make_eqs = function
                      [] -> []
                    | ((FunExp ((para, att_ty1), body), att_ty2), domty, ranty) :: rest ->
-                      let (s, t) = ty_exp (Environment.extend para (TyScheme ([], domty)) and_tyenv) body in
-                      (eqs_of_subst s) :: [(t, ranty)] :: (make_eqs_about_att_ty (TyFun (domty, ranty)) att_ty2)
-                      :: (make_eqs_about_att_ty (subst_type s domty) att_ty1) :: make_eqs rest
+                      let (s, t, rel) = ty_exp (Environment.extend para (TyScheme ([], domty)) and_tyenv) body in
+                      ((eqs_of_subst s) :: [(t, ranty)] :: (make_eqs_about_att_ty (TyFun (domty, ranty)) att_ty2)
+                      :: [make_eqs_about_att_ty (subst_type s domty) att_ty1], rel) :: make_eqs rest
                    | _ -> err ("For debug : this error cannot occur")
                  (* 本当に束縛すべき値を変数に束縛する *)
-                 and make_final_list s id_l tyenv' =
+                 and make_final_list s rel id_l tyenv' =
                    match id_l with
                      [] -> tyenv := tyenv'; [] (* andでつながれているものはすべて環境に追加したところで環境を更新 *)
                    | (id, att_ty) :: id_rest ->
-                      let TyScheme (_, ty) = Environment.lookup id and_tyenv in
-                      let newty = subst_type s ty in
-                      let eqs = (eqs_of_subst s) @ (make_eqs_about_att_ty newty att_ty) in
-                      let s' = squeeze_subst (unify eqs) in
-                      let newerty = subst_type s' newty in
-                      let (s'', newerty') =
-                        match newerty with
-                          TySet (alpha, l) ->
-                          let chosen_ty = List.hd (MySet.to_list l) in
-                          (squeeze_subst ((alpha, chosen_ty) :: s'), chosen_ty)
-                        | _ -> (s', newerty) in
-                      let tysc = closure newerty' !tyenv s'' in (* ここの環境は外の環境 *)
+                      let TyScheme (_, ty1) = Environment.lookup id and_tyenv in
+                      let ty2 = subst_type s ty1 in
+                      let eqs = (eqs_of_subst s) @ (make_eqs_about_att_ty ty2 att_ty) in
+                      let s1 = squeeze_subst (unify eqs) in
+                      let s2 = finalize_subst s1 in
+                      let s3 = finalize_subst (squeeze_subst (unify (eqs_of_subst ((reflect_dependency rel s2) @ s1)))) in
+                      let ty3 = subst_type s3 ty2 in
+                      let tysc = closure ty3 !tyenv s3 in (* ここの環境は外の環境 *)
                       let newtyenv = Environment.extend id tysc tyenv' in
-                      (newtyenv, newerty') :: make_final_list s' id_rest newtyenv
+                      (newtyenv, ty3) :: make_final_list s3 rel id_rest newtyenv
                  in
-                 let eqs = List.concat (make_eqs exp_dom_ran_l) in
+                 let (eqs, rel) = (fun (x, y) -> (List.concat (List.concat x), List.concat y)) (List.split (make_eqs exp_dom_ran_l)) in
                  let s = squeeze_subst (unify eqs) in
-                 make_final_list s id_l and_tyenv
+                 make_final_list s rel id_l and_tyenv
               | (typed_id, exp) :: inner_rest ->
                  (* まず変数が適当な関数に束縛されているようにする *)
                  let (id, _) = typed_id in
