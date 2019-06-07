@@ -279,11 +279,14 @@ IDt :
   | LPAREN x=IDt COLON ty=TupleType RPAREN { let (x', l) = x in (x', ty :: l) }
 
 Type :
-    t=nonempty_list(VariantType) { t }
+    option(BAR) v=VariantType l=list(MoreVariantType) { v :: l }
 
 VariantType :
-    option(BAR) c=CNSTR { (Constructor (c, TyNone c)) }
-  | option(BAR) c=CNSTR OF a=Arg { Constructor (c, a) }
+    c=CNSTR { (Constructor (c, TyNone c)) }
+  | c=CNSTR OF a=Arg { Constructor (c, a) }
+
+MoreVariantType :
+    BAR v=VariantType { v }
 
 Arg :
     t=TupleType { t }
