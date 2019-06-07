@@ -80,7 +80,6 @@ LookRightExpr :
   | e=DFunExpr { e }
   | e=LetRecExpr { e }
   | e=MatchExpr { e }
-  | e=TupleHeadExpr { (TupleExp e, []) }
 
 OrExpr :
     l=OrExpr OR r=AndExpr { (BinLogicOp(Or, l, r), []) }
@@ -140,6 +139,11 @@ FunInfixExpr :
   | LPAREN AND RPAREN { (FunExp (("x", []), (FunExp (("y", []), ((BinLogicOp (And, (Var "x", []), (Var "y", []))), [])), [])), []) }
   | LPAREN OR RPAREN { (FunExp (("x", []), (FunExp (("y", []), ((BinLogicOp (Or, (Var "x", []), (Var "y", []))), [])), [])), []) }
   | LPAREN HAT RPAREN { (FunExp (("x", []), (FunExp (("y", []), ((BinOp (Hat, (Var "x", []), (Var "y", []))), [])), [])), []) }
+  | e=CnstrExpr { e }
+
+CnstrExpr :
+    c=CNSTR { (Constr (c, None), []) }
+  | c=CNSTR e=CnstrExpr { (Constr (c, Some e), []) }
   | e=AExpr { e }
 
 AExpr :
@@ -148,8 +152,6 @@ AExpr :
   | FALSE  { (BLit false, []) }
   | s=STRINGV { (SLit s, []) }
   | i=ID   { (Var i, []) }
-  | c=CNSTR { (Constr (c, None), []) }
-  | c=CNSTR e=Expr { (Constr (c, Some e), []) }
   | LBOXBRA RBOXBRA  { (ListExp Emp, []) }
   | e=ListHeadExpr { (ListExp e, []) }
   | LPAREN e=Expr RPAREN { e }

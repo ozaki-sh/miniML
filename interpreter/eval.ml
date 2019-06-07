@@ -72,7 +72,7 @@ and string_of_exval = function
   | ConstrV (id, None) -> id
   | ConstrV (id, Some v) ->
      (match v with
-        ConstrV _ -> id ^ " (" ^ string_of_exval v ^ ")"
+        ConstrV (_, Some _) -> id ^ " (" ^ string_of_exval v ^ ")"
       | _ -> id ^ " " ^ string_of_exval v)
   | ProcV (_, _, _) -> "<fun>"
   | DProcV (_, _) -> "<dfun>"

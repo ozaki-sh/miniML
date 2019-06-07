@@ -71,7 +71,11 @@ and string_of_exp = function
      "TupleExp " ^ (string_of_tupleExp texp)
   | Wildcard -> "Wildcard"
 
-let rec string_of_tyrow = function
+let rec string_of_tytuple = function
+    TyEmpT -> ""
+  | TyConsT (ty, tytup) -> string_of_tyrow ty ^ ", " ^ string_of_tytuple tytup
+
+and string_of_tyrow = function
     TyInt -> "TyInt"
   | TyBool -> "TyBool"
   | TyString -> "TyString"
@@ -79,11 +83,11 @@ let rec string_of_tyrow = function
   | TyStringVar tyvar -> "TyStringVar " ^ tyvar
   | TyFun (domty, ranty) -> "TyFun (" ^ (string_of_tyrow domty) ^ ", " ^ (string_of_tyrow ranty) ^ ")"
   | TyList ty -> "TyList " ^ (string_of_tyrow ty)
-  | TyTuple tytup -> "TyTuple "
+  | TyTuple tytup -> "TyTuple (" ^ string_of_tytuple tytup ^ ")"
   | TyUser id -> "TyUser " ^ id
   | TyVariant id -> "TyVariant " ^ id
   | TyNone _ -> "TyNone"
-  | TySet (tyvar, l) -> "TySet (" ^ (string_of_int tyvar) ^ ", " ^ List.fold_left (fun x y -> x ^ "; " ^ y) "" ((List.map (fun x -> string_of_tyrow x) (MySet.to_list l)))
+  | TySet (tyvar, l) -> "TySet (" ^ (string_of_int tyvar) ^ ", " ^ (List.fold_left (fun x y -> x ^ "; " ^ y) "" ((List.map (fun x -> string_of_tyrow x) (MySet.to_list l)))) ^ ")"
 
 let rec string_of_tydecl = function
     Constructor (name, ty) -> name ^ " of " ^ string_of_tyrow ty
@@ -125,3 +129,9 @@ let rec string_of_subst s =
     (fun x y -> x ^ "; " ^ y)
     ""
     (List.map (fun (tyvar, ty) -> "(" ^ (string_of_int tyvar) ^ ", " ^ (string_of_tyrow ty) ^ ")") s)
+
+let rec string_of_eqs eqs =
+  List.fold_left
+    (fun x y -> x ^ "; " ^ y)
+    ""
+    (List.map (fun (ty1, ty2) -> "(" ^ (string_of_tyrow ty1) ^ ", " ^ (string_of_tyrow ty2) ^ ")") eqs)

@@ -36,7 +36,7 @@ type exp =
   | ILit of int (* ILit 3 --> 3 *)
   | BLit of bool (* BLit true --> true *)
   | SLit of string (* SLit "abc" --> "abc" *)
-  | Constr of name * typedExp option (* Constr "A 1" --> A 1 *)
+  | Constr of name * typedExp option (* Constr "A" (Some (ILit 1)) --> A 1 *)
   | BinOp of binOp * typedExp * typedExp
   (* BinOp(Plus, ILit 4, Var "x") --> 4 + x *)
   | BinLogicOp of binLogicOp * typedExp * typedExp
@@ -60,11 +60,11 @@ type exp =
   | ListExp of listExp
   (* ListExp(Cons(ILit 1, (Cons(ILit 2, Emp)))) --> [1;2] *)
   | MatchExp of typedExp * (typedExp * typedExp) list
-  (* MatchExp([ILit 1; ILit 2],
-              [([ILit 0; ILit 1], ILit 0); ([ILit 1; ILit 2], ILit 1)]) -->
-     match 1, 2 with
-       0, 1 -> 0
-     | 1, 2 -> 1 *)
+  (* MatchExp(ILit 1,
+              [(ILit 0, ILit 0); (ILit 1, ILit 1)]) -->
+     match 1 with
+       0 -> 0
+     | 1 -> 1 *)
   | TupleExp of tupleExp (* TupeExp (Cons(ILit 3, Cons (BLit true, Emp))) --> (3, true) *)
   | Wildcard (* Wildcard --> _ *)
 and listExp = Emp | Cons of typedExp * listExp
@@ -141,24 +141,27 @@ let rec string_of_ty ty =
         TyEmpT -> ""
       | TyConsT (ty, tytup') ->
          (match ty with
-            TyFun (_, _) -> "(" ^ (body_func ty) ^ ") * " ^ (inner_loop tytup')
+            TyFun _
+          | TyTuple _ -> "(" ^ (body_func ty) ^ ") * " ^ (inner_loop tytup')
           | _ -> (body_func ty) ^ " * " ^ (inner_loop tytup'))
     in
     let str = inner_loop tytup in
     let str_length = String.length str in
-    "(" ^ String.sub str 0 (str_length - 3) ^ ")"
+    String.sub str 0 (str_length - 3)
   and body_func ty =
     match ty with
       TyInt -> "int"
     | TyBool -> "bool"
     | TyString -> "string"
     | TyVar tyvar -> List.assoc tyvar tyvar_string_list
-    | TyFun (TyFun (_, _) as domty, ranty) -> "(" ^ (body_func domty) ^ ")" ^
-                                                " -> " ^ (body_func ranty)
-    | TyFun (domty, ranty) -> (body_func domty) ^ " -> " ^ (body_func ranty)
+    | TyFun (domty, ranty) ->
+       (match domty with
+          TyFun _
+        | TyTuple _ -> "(" ^ (body_func domty) ^ ") -> " ^ (body_func ranty)
+        | _ -> (body_func domty) ^ " -> " ^ (body_func ranty))
     | TyList ty ->
        (match ty with
-          TyFun (_, _)
+          TyFun _
         | TyTuple _  -> "(" ^ (body_func ty) ^ ")" ^ " list"
         | _ -> (body_func ty) ^ " list")
     | TyTuple tytup -> string_of_tytuple tytup

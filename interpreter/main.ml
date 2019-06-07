@@ -133,7 +133,7 @@ let read_eval_print_from_file env tyenv defenv rev_defenv filename =
                    inner_display rest false
               and outer_display l =
                 match l with
-                  [] -> read_eval_print env tyenv newdefenv newrev_defenv
+                  [] -> inner_loop env tyenv newdefenv newrev_defenv str_rest
                 | head :: rest ->
                    inner_display head true;
                    outer_display rest
