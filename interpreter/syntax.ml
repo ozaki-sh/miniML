@@ -230,6 +230,6 @@ let string_of_defs ds =
      let str = List.fold_right (fun x y -> x ^ " | " ^ y) strdefs "" in
      String.sub str 0 (String.length str - 3)
   | Field _ ->
-     let str = List.fold_right (fun x y -> x ^ " ; " ^ y) strdefs "" in
+     let str = List.fold_right (fun x y -> x ^ " ;" ^ y) strdefs "" in
      "{ " ^ str ^ " }"
 let pp_defs ds = print_string (string_of_defs ds)

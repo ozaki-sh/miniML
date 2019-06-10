@@ -219,11 +219,11 @@ MatchExpr :
     MATCH e1=Expr WITH option(BAR) e2=PatternMatchExpr { (MatchExp (e1 , e2), []) }
 
 TupleTailExpr :
-    e=Expr { ConsT (e, EmpT) }
-  | e=Expr COMMA lst=TupleTailExpr { ConsT (e, lst) }
+    COMMA e=Expr { ConsT (e, EmpT) }
+  | COMMA e=Expr lst=TupleTailExpr { ConsT (e, lst) }
 
 TupleHeadExpr :
-    e=Expr COMMA lst=TupleTailExpr { ConsT (e, lst) }
+    e=Expr lst=TupleTailExpr { ConsT (e, lst) }
 
 Pattern :
     LBOXBRA pt=Pattern RBOXBRA { (ListExp (Cons (pt, Emp)), []) }
@@ -232,11 +232,11 @@ Pattern :
   | pt=APattern { pt }
 
 TupleTailPattern :
-    pt=Pattern { ConsT (pt, EmpT) }
-  | pt=Pattern COMMA lst=TupleTailPattern { ConsT (pt, lst) }
+    COMMA pt=Pattern { ConsT (pt, EmpT) }
+  | COMMA pt=Pattern lst=TupleTailPattern { ConsT (pt, lst) }
 
 TupleHeadPattern :
-    pt=Pattern COMMA lst=TupleTailPattern { ConsT (pt, lst) }
+    pt=Pattern lst=TupleTailPattern { ConsT (pt, lst) }
 
 APattern :
     i=INTV { (ILit i, []) }
@@ -280,6 +280,7 @@ IDt :
 
 Type :
     option(BAR) v=VariantType l=list(MoreVariantType) { v :: l }
+  | LCLYBRA r=RecordType l=list(MoreRecordType) option(SEMI) RCLYBRA { r :: l }
 
 VariantType :
     c=CNSTR { (Constructor (c, TyNone c)) }
@@ -291,12 +292,18 @@ MoreVariantType :
 Arg :
     t=TupleType { t }
 
+RecordType :
+    x=ID COLON t=TupleType { Field (x, t) }
+
+MoreRecordType :
+    SEMI r=RecordType { r }
+
 TupleTailType :
-    ty=TupleType { TyConsT (ty, TyEmpT) }
-  | ty1=TupleType MULT ty2=TupleTailType { TyConsT (ty1, ty2) }
+    MULT ty=TupleType { TyConsT (ty, TyEmpT) }
+  | MULT ty1=TupleType ty2=TupleTailType { TyConsT (ty1, ty2) }
 
 TupleHeadType :
-    ty1=TupleType MULT ty2=TupleTailType { TyConsT (ty1, ty2) }
+    ty1=TupleType ty2=TupleTailType { TyConsT (ty1, ty2) }
 
 TupleType :
     ty=TupleHeadType { TyTuple ty }
