@@ -9,13 +9,15 @@ type exval =
   | IntV of int
   | BoolV of bool
   | StringV of string
-  | ConstrV of id * exval option
+  | ConstrV of name * exval option
+  | RecordV of recordval
   | ProcV of id * exp * dnval Environment.t ref
   | DProcV of id * exp
   | ListV of listval
   | TupleV of tupleval
 and listval = EmpV | ConsV of exval * listval
 and tupleval = EmpTV | ConsTV of exval * tupleval
+and recordval = EmpRV | ConsRV of (name * exval) * recordval
 and dnval = exval
 
 
@@ -30,20 +32,11 @@ let rec string_of_list l =
       EmpV -> "]"
     | ConsV (head, tail) ->
        "; " ^ (string_of_exval head) ^ (inner_loop tail)
-     (*  (match head with
-          IntV i -> "; " ^ (string_of_int i) ^ (inner_loop tail)
-        | BoolV b -> "; " ^ (string_of_bool b) ^ (inner_loop tail)
-        | StringV s -> "; " ^ "\"" ^ s ^ "\"" ^ (inner_loop tail)
-        | ConstrV (id, None) ->
-        | ProcV (_, _, _) -> "; " ^ "<fun>" ^ (inner_loop tail)
-        | DProcV (_, _) -> "; " ^ "<dfun>" ^ (inner_loop tail)
-        | ListV l -> "; " ^ (string_of_list l) ^ (inner_loop tail)
-        | TupleV l -> "; " ^ (string_of_tuple l) ^ (inner_loop tail))*)
   in
-    let str = inner_loop l in
-    let str_length = String.length str in
-    if str_length <= 2 then "[]"
-                       else "[" ^ String.sub str 2 (str_length - 2)
+  let str = inner_loop l in
+  let str_length = String.length str in
+  if str_length <= 2 then "[]"
+  else "[" ^ String.sub str 2 (str_length - 2)
 
 and string_of_tuple l =
   let rec inner_loop l =
@@ -51,29 +44,33 @@ and string_of_tuple l =
       EmpTV -> ")"
     | ConsTV (head, tail) ->
        ", " ^ (string_of_exval head) ^ (inner_loop tail)
-       (*(match head with
-          IntV i -> ", " ^ (string_of_int i) ^ (inner_loop tail)
-        | BoolV b -> ", " ^ (string_of_bool b) ^ (inner_loop tail)
-        | StringV s -> ", " ^ "\"" ^ s ^ "\"" ^ (inner_loop tail)
-        | ProcV (_, _, _) -> ", " ^ "<fun>" ^ (inner_loop tail)
-        | DProcV (_, _) -> ", " ^ "<dfun>" ^ (inner_loop tail)
-        | ListV l -> ", " ^ (string_of_list l) ^ (inner_loop tail)
-        | TupleV l -> ", " ^ (string_of_tuple l) ^ (inner_loop tail))*)
   in
-    let str = inner_loop l in
-    let str_length = String.length str in
-    "(" ^ String.sub str 2 (str_length - 2)
+  let str = inner_loop l in
+  let str_length = String.length str in
+  "(" ^ String.sub str 2 (str_length - 2)
+
+and string_of_record l =
+  let rec inner_loop l =
+    match l with
+      EmpRV -> "}"
+    | ConsRV ((name, head), tail) ->
+       "; " ^ name ^ " = " ^ (string_of_exval head) ^ (inner_loop tail)
+  in
+  let str = inner_loop l in
+  let str_length = String.length str in
+  "{" ^ String.sub str 2 (str_length - 2)
 
 (* pretty printing *)
 and string_of_exval = function
     IntV i -> string_of_int i
   | BoolV b -> string_of_bool b
   | StringV s -> "\"" ^ s ^ "\""
-  | ConstrV (id, None) -> id
-  | ConstrV (id, Some v) ->
+  | ConstrV (name, None) -> name
+  | ConstrV (name, Some v) ->
      (match v with
-        ConstrV (_, Some _) -> id ^ " (" ^ string_of_exval v ^ ")"
-      | _ -> id ^ " " ^ string_of_exval v)
+        ConstrV (_, Some _) -> name ^ " (" ^ string_of_exval v ^ ")"
+      | _ -> name ^ " " ^ string_of_exval v)
+  | RecordV l -> string_of_record l
   | ProcV (_, _, _) -> "<fun>"
   | DProcV (_, _) -> "<dfun>"
   | ListV l -> string_of_list l
@@ -89,17 +86,24 @@ let rec pattern_match pattern value =
   | BLit b1, BoolV b2 when (b1 = b2) -> []
   | SLit s1, StringV s2 when (s1 = s2) -> []
   | Var x, _ -> [(x, value)]
-  | Constr (id1, None), ConstrV (id2, None) when (id1 = id2) -> []
-  | Constr (id1, Some (pt, _)), ConstrV (id2, Some v) ->
+  | Constr (name1, None), ConstrV (name2, None) when (name1 = name2) -> []
+  | Constr (name1, Some (pt, _)), ConstrV (name2, Some v) when (name1 = name2) ->
      pattern_match pt v
+  | Record EmpR, RecordV EmpRV -> []
+  | Record (ConsR ((name1, (pt, _)), l1)), RecordV (ConsRV ((name2, v), l2)) ->
+     (pattern_match pt v) @ (pattern_match (Record l1) (RecordV l2))
+  | BinOp (Cons, (pt1, _), (pt2, _)), ListV (ConsV (v, l)) ->
+     (pattern_match pt1 v) @ (pattern_match pt2 (ListV l))
   | ListExp Emp, ListV EmpV -> []
-  | ListExp (Cons ((pt, _), Emp)), ListV (ConsV (v, EmpV)) ->
+  | ListExp (Cons ((pt, _), l1)), ListV (ConsV (v, l2)) ->
+     (pattern_match pt v) @ (pattern_match (ListExp l1) (ListV l2))
+  (*| ListExp (Cons ((pt, _), Emp)), ListV (ConsV (v, EmpV)) ->
      pattern_match pt v
   | ListExp (Cons ((pt1, _), Cons ((pt2, _), Emp))), ListV (ConsV (v, l)) ->
-     (pattern_match pt1 v) @ (pattern_match pt2 (ListV l))
+     (pattern_match pt1 v) @ (pattern_match pt2 (ListV l))*)
   | TupleExp EmpT, TupleV EmpTV -> []
-  | TupleExp (ConsT ((pt, _), l)), TupleV (ConsTV (v, l')) ->
-     (pattern_match pt v) @ (pattern_match (TupleExp l) (TupleV l'))
+  | TupleExp (ConsT ((pt, _), l1)), TupleV (ConsTV (v, l2)) ->
+     (pattern_match pt v) @ (pattern_match (TupleExp l1) (TupleV l2))
   | Wildcard, _ -> []
   | _, _ -> raise MatchError
 
@@ -147,12 +151,21 @@ and eval_exp env = function
   | ILit i -> IntV i
   | BLit b -> BoolV b
   | SLit s -> StringV s
-  | Constr (id, expop) ->
+  | Constr (name, expop) ->
      (match expop with
-        None -> ConstrV (id, None)
+        None -> ConstrV (name, None)
       | Some (exp, _) ->
          let arg = eval_exp env exp in
-         ConstrV (id, Some arg))
+         ConstrV (name, Some arg))
+  | Record rexp ->
+      let rec eval_record rexp =
+       match rexp with
+         EmpR -> EmpRV
+       | ConsR ((name, (exp, _)), rest) ->
+          let value = eval_exp env exp in
+          ConsRV ((name, value), eval_record rest)
+     in
+     RecordV (eval_record rexp)
   | BinOp (op, (exp1, _), (exp2, _)) ->
      let arg1 = eval_exp env exp1 in
      let arg2 = eval_exp env exp2 in

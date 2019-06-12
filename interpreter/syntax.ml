@@ -24,6 +24,7 @@ type ty =
   | TyTuple of tytuple
   | TyUser of id
   | TyVariant of id
+  | TyRecord of id
   | TyNone of name
   | TySet of tyvar * ty MySet.t
 and tytuple = TyEmpT | TyConsT of ty * tytuple
@@ -37,6 +38,7 @@ type exp =
   | BLit of bool (* BLit true --> true *)
   | SLit of string (* SLit "abc" --> "abc" *)
   | Constr of name * typedExp option (* Constr "A" (Some (ILit 1)) --> A 1 *)
+  | Record of recordExp
   | BinOp of binOp * typedExp * typedExp
   (* BinOp(Plus, ILit 4, Var "x") --> 4 + x *)
   | BinLogicOp of binLogicOp * typedExp * typedExp
@@ -58,17 +60,18 @@ type exp =
   (* AppExp(Var "f", ILit 3) --> f 3 *)
   | LetRecExp of (typedId * typedExp) list * typedExp
   | ListExp of listExp
-  (* ListExp(Cons(ILit 1, (Cons(ILit 2, Emp)))) --> [1;2] *)
+  (* ListExp(Cons(ILit 1, (Cons (ILit 2, Emp)))) --> [1;2] *)
   | MatchExp of typedExp * (typedExp * typedExp) list
   (* MatchExp(ILit 1,
               [(ILit 0, ILit 0); (ILit 1, ILit 1)]) -->
      match 1 with
        0 -> 0
      | 1 -> 1 *)
-  | TupleExp of tupleExp (* TupeExp (Cons(ILit 3, Cons (BLit true, Emp))) --> (3, true) *)
+  | TupleExp of tupleExp (* TupeExp (ConsT (ILit 3, ConsT (BLit true, EmpT))) --> (3, true) *)
   | Wildcard (* Wildcard --> _ *)
 and listExp = Emp | Cons of typedExp * listExp
 and tupleExp = EmpT | ConsT of typedExp * tupleExp
+and recordExp = EmpR | ConsR of (name * typedExp) * recordExp
 (* 型注釈付きの式を表す型 *)
 and typedExp = exp * ty list
 
@@ -128,7 +131,7 @@ let make_tyvar_string_list ty =
     | TyTuple tytup  -> case_tytuple tytup ts_list
     | TyUser x -> ts_list
     | TyVariant x -> ts_list
-    | TySet _ -> err ("sss")
+    | TyRecord x -> ts_list
     | _ -> err ("For debug: at make_tyvar_string_list")
   in
   body_func ty []
@@ -167,6 +170,7 @@ let rec string_of_ty ty =
     | TyTuple tytup -> string_of_tytuple tytup
     | TyUser x -> x
     | TyVariant x -> x
+    | TyRecord x -> x
     | _ -> err ("For debug: at string_of_ty")
   in
   body_func ty
@@ -202,6 +206,7 @@ let rec freevar_ty ty =
   | TyList ty -> freevar_ty ty
   | TyTuple tytup -> freevar_tytuple tytup
   | TyVariant x -> MySet.empty
+  | TyRecord x -> MySet.empty
   | TyNone _ -> MySet.empty
   | TySet _ -> MySet.empty
   | _ -> err ("For debug: at freevar_ty")
@@ -230,6 +235,6 @@ let string_of_defs ds =
      let str = List.fold_right (fun x y -> x ^ " | " ^ y) strdefs "" in
      String.sub str 0 (String.length str - 3)
   | Field _ ->
-     let str = List.fold_right (fun x y -> x ^ " ;" ^ y) strdefs "" in
-     "{ " ^ str ^ " }"
+     let str = List.fold_right (fun x y -> x ^ "; " ^ y) strdefs "" in
+     "{ " ^ str ^ "}"
 let pp_defs ds = print_string (string_of_defs ds)

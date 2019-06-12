@@ -154,6 +154,7 @@ AExpr :
   | i=ID   { (Var i, []) }
   | LBOXBRA RBOXBRA  { (ListExp Emp, []) }
   | e=ListHeadExpr { (ListExp e, []) }
+  | e=RecordHeadExpr { (Record e, []) }
   | LPAREN e=Expr RPAREN { e }
   | LPAREN e=Expr COLON ty=TupleType RPAREN { let (e', l) = e in (e', ty :: l) }
 
@@ -161,8 +162,18 @@ ListHeadExpr :
     LBOXBRA e=Expr lst=ListTailExpr { Cons (e, lst) }
 
 ListTailExpr :
-    SEMI e=Expr option(SEMI) lst=ListTailExpr { Cons (e, lst) }
-  | RBOXBRA { Emp }
+    SEMI e=Expr lst=ListTailExpr { Cons (e, lst) }
+  | option(SEMI) RBOXBRA { Emp }
+
+RecordHeadExpr :
+    LCLYBRA e=RecordExpr lst=RecordTailExpr { ConsR (e, lst) }
+
+RecordTailExpr :
+    SEMI e=RecordExpr lst=RecordTailExpr { ConsR (e, lst) }
+  | option(SEMI) RCLYBRA { EmpR }
+
+RecordExpr :
+    x=ID EQ e=Expr { (x, e) }
 
 IfExpr :
     IF c=Expr THEN t=Expr ELSE e=Expr { (IfExp (c, t, e), []) }
@@ -226,10 +237,11 @@ TupleHeadExpr :
     e=Expr lst=TupleTailExpr { ConsT (e, lst) }
 
 Pattern :
-    LBOXBRA pt=Pattern RBOXBRA { (ListExp (Cons (pt, Emp)), []) }
-  | pt1=Pattern CONS pt2=Pattern { (ListExp (Cons (pt1, Cons (pt2, Emp))), []) }
-  | pt=TupleHeadPattern { (TupleExp pt, []) }
-  | pt=APattern { pt }
+    pt=TuplePattern { pt }
+
+TuplePattern :
+    pt=TupleHeadPattern { (TupleExp pt, []) }
+  | pt=ConsPattern { pt }
 
 TupleTailPattern :
     COMMA pt=Pattern { ConsT (pt, EmpT) }
@@ -238,18 +250,44 @@ TupleTailPattern :
 TupleHeadPattern :
     pt=Pattern lst=TupleTailPattern { ConsT (pt, lst) }
 
+ConsPattern :
+    ptl=CnstrPattern CONS ptr=ConsPattern { (BinOp (Cons, ptl, ptr), []) }
+  | pt=CnstrPattern { pt }
+
+CnstrPattern :
+    c=CNSTR { (Constr (c, None), []) }
+  | c=CNSTR pt=CnstrPattern { (Constr (c, Some pt), []) }
+  | pt=APattern { pt }
+
 APattern :
     i=INTV { (ILit i, []) }
   | TRUE { (BLit true, []) }
   | FALSE  { (BLit false, []) }
   | s=STRINGV { (SLit s, []) }
   | x=ID { (Var x, []) }
-  | c=CNSTR { (Constr (c, None), []) }
-  | c=CNSTR pt=Pattern { (Constr (c, Some pt), []) }
   | LBOXBRA RBOXBRA { (ListExp Emp, []) }
+  | pt=ListHeadPattern { (ListExp pt, []) }
+  | pt=RecordHeadPattern { (Record pt, []) }
   | UNDERSCORE { (Wildcard, []) }
   | LPAREN pt=Pattern RPAREN { pt }
   | LPAREN pt=Pattern COLON ty=TupleType RPAREN { let (pt', l) = pt in (pt', ty :: l) }
+
+ListHeadPattern :
+    LBOXBRA pt=Pattern lst=ListTailPattern { Cons (pt, lst) }
+
+ListTailPattern :
+    SEMI pt=Pattern lst=ListTailExpr { Cons (pt, lst) }
+  | option(SEMI) RBOXBRA { Emp }
+
+RecordHeadPattern :
+    LCLYBRA pt=RecordPattern lst=RecordTailPattern { ConsR (pt, lst) }
+
+RecordTailPattern :
+    SEMI pt=RecordPattern lst=RecordTailPattern { ConsR (pt, lst) }
+  | option(SEMI) RCLYBRA { EmpR }
+
+RecordPattern :
+    x=ID EQ pt=Pattern { (x, pt) }
 
 PatternMatchExpr :
     pt=Pattern pts=list(MorePattern) RARROW e1=Expr e2=list(MorePatternMatchExpr) {
@@ -280,7 +318,7 @@ IDt :
 
 Type :
     option(BAR) v=VariantType l=list(MoreVariantType) { v :: l }
-  | LCLYBRA r=RecordType l=list(MoreRecordType) option(SEMI) RCLYBRA { r :: l }
+  | l=RecordHeadType { l }
 
 VariantType :
     c=CNSTR { (Constructor (c, TyNone c)) }
@@ -292,11 +330,15 @@ MoreVariantType :
 Arg :
     t=TupleType { t }
 
-RecordType :
-    x=ID COLON t=TupleType { Field (x, t) }
+RecordHeadType :
+    LCLYBRA r=RecordType lst=RecordTailType { r :: lst }
 
-MoreRecordType :
-    SEMI r=RecordType { r }
+RecordTailType :
+    SEMI r=RecordType lst=RecordTailType { r :: lst }
+  | option(SEMI) RCLYBRA { [] }
+
+RecordType :
+    x=ID COLON ty=TupleType { Field (x, ty) }
 
 TupleTailType :
     MULT ty=TupleType { TyConsT (ty, TyEmpT) }

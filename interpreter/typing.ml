@@ -53,7 +53,8 @@ let rec unify eqs =
       | TyTuple (TyConsT (_, _)), TyTuple TyEmpT -> raise TypeError
       | TyTuple (TyConsT (ty1', tytup1)), TyTuple (TyConsT (ty2', tytup2)) ->
          unify ((ty1', ty2') :: (TyTuple tytup1, TyTuple tytup2) :: rest)
-      | TyVariant id1, TyVariant id2 when id1 = id2 -> unify rest
+      | TyVariant name1, TyVariant name2 when name1 = name2 -> unify rest
+      | TyRecord name1, TyRecord name2 when name1 = name2 -> unify rest
       | TyVar alpha, _ ->
          if MySet.member alpha (freevar_ty ty2) then raise TypeError
          else (alpha, ty2) :: unify (subst_eqs [(alpha, ty2)] rest)
@@ -473,9 +474,15 @@ let rec ty_exp tyenv = function
         Rev_environment.Not_bound -> err ("constructor not bound: " ^ name))
   | (BinOp (op, exp1, exp2), att_ty) ->
      let (s1, ty1, rel1) = ty_exp tyenv exp1 in
+     print_string (Debug.string_of_subst s1);
+     print_newline();
      let (s2, ty2, rel2) = ty_exp tyenv exp2 in
+     print_string (Debug.string_of_subst s2);
+     print_newline();
      let (eqs3, ty) =  ty_prim op ty1 ty2 in
      let eqs = (eqs_of_subst s1) @ (eqs_of_subst s2) @ eqs3 @ (make_eqs_about_att_ty ty att_ty) in
+     print_string (Debug.string_of_eqs eqs);
+     print_newline();
      let s3 = squeeze_subst (unify eqs) in
      (s3, subst_type s3 ty, rel1 @ rel2)
   | (BinLogicOp (op, exp1, exp2), att_ty) ->
@@ -612,6 +619,7 @@ let rec ty_exp tyenv = function
        | (ILit _, _) | (BLit _, _) | (SLit _, _) -> []
        | (Constr (_, None), _) -> []
        | (Constr (_, Some exp), _) -> gather_id_from_pattern exp
+       | (BinOp (Cons, exp1, exp2), _) -> (gather_id_from_pattern exp1) @ (gather_id_from_pattern exp2)
        | (ListExp l, _) -> case_list l
        | (TupleExp l, _) -> case_tuple l
        | (Wildcard, _) -> []
