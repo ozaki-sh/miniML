@@ -18,3 +18,5 @@ let rec fold_right f env a =
     | (_, v)::rest -> f v (fold_right f rest a)
 
 let member = List.mem_assoc
+
+let partition p = List.partition (fun (_, v) -> p v)

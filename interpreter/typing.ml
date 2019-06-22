@@ -10,6 +10,8 @@ exception Not_exact_matched of (ty option * ty option)
 let err s = raise (Error s)
 
 let defenv = ref Environment.empty
+(*let vardefenv = ref Environment.empty*)
+let recdefenv = ref Environment.empty
 let rev_defenv = ref Rev_environment.empty
 
 let rec subst_type (subst : subst) t =
@@ -160,6 +162,12 @@ let make_eqs_about_att_ty ty attached_ty_list =
   in
   main_loop attached_ty_list
 
+let rec make_dependent_relation alpha beta l =
+  match l with
+    [] -> []
+  | (arg_ty, this_ty) :: rest ->
+     ((alpha, this_ty), (beta, arg_ty)) :: make_dependent_relation alpha beta rest
+
 (* (束縛すべき変数と型の組のリスト,型代入の集合,型注釈に関するeqsの集合)を返す *)
 let rec pattern_match (pattern, att_ty) ty =
   let body_func pattern ty =
@@ -217,6 +225,9 @@ let rec get_attached_ty_list (exp, att_ty) =
     and from_tupleExp = function
         EmpT -> []
       | ConsT (exp, l) -> (get_attached_ty_list exp) @ from_tupleExp l
+    and from_recordExp = function
+        EmpR -> []
+      | ConsR ((_, exp), l) -> (get_attached_ty_list exp) @ from_recordExp l
     and from_exp_exp_list = function
         [] -> []
       | (exp1, exp2) :: rest -> (get_attached_ty_list exp1) @ (get_attached_ty_list exp2) @ from_exp_exp_list rest
@@ -228,6 +239,7 @@ let rec get_attached_ty_list (exp, att_ty) =
     | SLit _ -> []
     | Constr (_, None) -> []
     | Constr (_, Some exp) -> get_attached_ty_list exp
+    | Record recordExp -> from_recordExp recordExp
     | BinOp (_, exp1, exp2) -> (get_attached_ty_list exp1) @ (get_attached_ty_list exp2)
     | BinLogicOp (_, exp1, exp2) -> (get_attached_ty_list exp1) @ (get_attached_ty_list exp2)
     | IfExp (exp1, exp2, exp3) -> (get_attached_ty_list exp1) @ (get_attached_ty_list exp2) @ (get_attached_ty_list exp3)
@@ -309,7 +321,7 @@ let rec transform exp_with_ty stv_to_itv_list =
           let def = List.hd (Environment.lookup x !defenv) in
           (match def with
              Constructor _ -> TyVariant x
-           | Field _ -> TyInt (* should be changed *))
+           | Field _ -> TyRecord x)
         with
           Environment.Not_bound -> err ("type not defined: " ^ x))
     | _ -> err ("For debug : at transform_att_ty")
@@ -333,6 +345,9 @@ let rec transform exp_with_ty stv_to_itv_list =
       and transform_tupleExp = function
           EmpT -> EmpT
         | ConsT (exp, l) -> ConsT (body_func exp, transform_tupleExp l)
+      and transform_recordExp = function
+          EmpR -> EmpR
+        | ConsR ((name, exp), l) -> ConsR ((name, body_func exp), transform_recordExp l)
       and transform_exp_exp_list = function
           [] -> []
         | (exp1, exp2) :: rest -> (body_func exp1, body_func exp2) :: (transform_exp_exp_list rest)
@@ -344,6 +359,7 @@ let rec transform exp_with_ty stv_to_itv_list =
       | SLit s -> SLit s
       | Constr (id, None) -> Constr (id, None)
       | Constr (id, Some exp) -> Constr (id, Some (body_func exp))
+      | Record recordExp -> Record (transform_recordExp recordExp)
       | BinOp (op, exp1, exp2) -> BinOp (op, body_func exp1, body_func exp2)
       | BinLogicOp (op, exp1, exp2) -> BinLogicOp (op, body_func exp1, body_func exp2)
       | IfExp (exp1, exp2, exp3) -> IfExp (body_func exp1, body_func exp2, body_func exp3)
@@ -376,7 +392,7 @@ let rec transform_decl decl stv_to_itv_list =
           let def = List.hd (Environment.lookup x !defenv) in
           (match def with
              Constructor _ -> TyVariant x
-           | Field _ -> TyInt (* should be changed *))
+           | Field _ -> TyRecord x)
         with
           Environment.Not_bound -> err ("type not defined: " ^ x))
     | _ -> err ("For debug : at transform_decl")
@@ -437,12 +453,6 @@ let rec ty_exp tyenv = function
      let s = unify eqs in
      (s, TyString, [])
   | (Constr (name, expop), att_ty) ->
-     let rec make_dependent_relation alpha beta l =
-       match l with
-         [] -> []
-       | (arg_ty, this_ty) :: rest ->
-          ((alpha, this_ty), (beta, arg_ty)) :: make_dependent_relation alpha beta rest
-     in
      (try
         let l = List.map (fun (x, y) -> (x, TyVariant y)) (Rev_environment.lookup name !rev_defenv) in
         let (arg_ty_l, this_ty_l) = List.split l in
@@ -472,17 +482,108 @@ let rec ty_exp tyenv = function
         (s2, subst_type s2 (TyVar alpha), rel @ arg_rel)
       with
         Rev_environment.Not_bound -> err ("constructor not bound: " ^ name))
+  | (Record l, att_ty) ->
+     let rec get_candidates is_first candidates name_l = function
+         EmpR -> (MySet.to_list candidates, name_l)
+       | ConsR ((name, _), rest) ->
+          if List.mem name name_l then err ("The record field label " ^ name ^ " is defined several times")
+          else
+            (try
+               let this_ty_names = List.map (fun (_, this_ty_name) -> this_ty_name) (Rev_environment.lookup name !rev_defenv) in
+               if is_first then
+                 get_candidates false (MySet.from_list this_ty_names) (name :: name_l) rest
+               else
+                 let now_candidates = MySet.intersection (MySet.from_list this_ty_names) candidates in
+                 if MySet.length now_candidates = 0 then
+                   let this_ty_name = List.hd this_ty_names in
+                   let expected_ty_name = List.hd (MySet.to_list candidates) in
+                   err ("The record field " ^ name ^ " belongs to type " ^ this_ty_name ^ "\n"
+                        ^ "but is mixed here with fields of type " ^ expected_ty_name)
+                 else
+                   get_candidates false now_candidates (name :: name_l) rest
+           with
+             Rev_environment.Not_bound -> err ("record field not bound: " ^ name))
+     and filter_satisfied candidates name_l first_out flag =
+       match candidates with
+         [] -> ([], first_out, flag)
+       | candidate :: rest ->
+          let name_l' = List.map (fun x -> match x with Field (n, _) -> n | _ -> "" (* nonsense *)) (Environment.lookup candidate !recdefenv) in
+          let name_set = MySet.from_list name_l in
+          let name_set' = MySet.from_list name_l' in
+          let diff_set = MySet.diff name_set' name_set in
+          let diff_set' = MySet.diff name_set name_set' in
+          if MySet.length diff_set = 0 && MySet.length diff_set' = 0 then
+            let (l', fo, fl) = filter_satisfied rest name_l first_out flag in
+            (candidate :: l', fo, fl)
+          else if MySet.length diff_set != 0 then
+            match first_out with
+               None ->
+                let this_is_first_out = Some (List.hd (MySet.to_list diff_set)) in
+                let (l', _, _) = filter_satisfied rest name_l this_is_first_out flag in
+                (l', this_is_first_out, 0)
+             | Some _ ->
+                let (l', _, _)=  filter_satisfied rest name_l first_out flag in
+                (l', first_out, 0)
+          else
+            match first_out with
+               None ->
+                let this_is_first_out = Some (List.hd (MySet.to_list diff_set')) in
+                let (l', _, _) = filter_satisfied rest name_l this_is_first_out flag in
+                (l', this_is_first_out, 1 )
+             | Some _ ->
+                let (l', _, _)=  filter_satisfied rest name_l first_out flag in
+                (l', first_out, 1)
+     and make_name_beta_l = function
+         [] -> []
+       | name :: rest ->
+          let beta = fresh_tyvar () in
+          (name, beta) :: make_name_beta_l rest
+     and make_subst_and_rel alpha this_ty_l name_beta_l = function
+         EmpR -> ([], [])
+       | ConsR ((name, exp), rest) ->
+          let (s, ty, rel) = ty_exp tyenv exp in
+          let (s', rel') = make_subst_and_rel alpha this_ty_l name_beta_l rest in
+          let beta = List.assoc name name_beta_l in
+          let l = List.map (fun (x, y) -> (x, TyRecord y)) (List.filter (fun (_, this_ty) -> List.mem this_ty this_ty_l) (Rev_environment.lookup name !rev_defenv)) in
+          let (field_ty_l, _) = List.split l in
+          let s'' =
+            if List.length l = 1 then
+              unify [(TyVar beta, List.hd field_ty_l); (TyVar beta, ty)]
+            else
+              unify [(TyVar beta, TySet (beta, MySet.from_list field_ty_l)); (TyVar beta, ty)] in
+          let rel'' = make_dependent_relation alpha beta l in
+          (s @ s'' @ s', rel @ rel'' @ rel)
+     in
+     let (candidates, name_l) = get_candidates true MySet.empty [] l in
+     let (this_ty_l, first_out, flag) = filter_satisfied candidates name_l None 0 in
+     if List.length this_ty_l = 0 then
+       match first_out with
+         None -> err ("For debug: record")
+       | Some name ->
+          if flag = 0 then
+            err ("Some record fields are undefined: " ^ name)
+          else
+            err ("record field not bound: " ^ name)
+     else
+       let alpha = fresh_tyvar () in
+       let name_beta_l = make_name_beta_l name_l in
+       let this_ty_set = MySet.from_list (List.map (fun x -> TyRecord x) this_ty_l) in
+       let (field_s, rel) = make_subst_and_rel alpha this_ty_l name_beta_l l in
+       let this_s =
+         if MySet.length this_ty_set = 1 then
+           [(alpha, (List.hd (MySet.to_list this_ty_set)))]
+         else
+           [(alpha, TySet (alpha, this_ty_set))] in
+       let field_eqs = eqs_of_subst (squeeze_subst field_s) in
+       let this_eqs = eqs_of_subst this_s in
+       let eqs = field_eqs @ this_eqs @ make_eqs_about_att_ty (TyVar alpha) att_ty in
+       let s = squeeze_subst (unify eqs) in
+       (s, subst_type s (TyVar alpha), rel)
   | (BinOp (op, exp1, exp2), att_ty) ->
      let (s1, ty1, rel1) = ty_exp tyenv exp1 in
-     print_string (Debug.string_of_subst s1);
-     print_newline();
      let (s2, ty2, rel2) = ty_exp tyenv exp2 in
-     print_string (Debug.string_of_subst s2);
-     print_newline();
      let (eqs3, ty) =  ty_prim op ty1 ty2 in
      let eqs = (eqs_of_subst s1) @ (eqs_of_subst s2) @ eqs3 @ (make_eqs_about_att_ty ty att_ty) in
-     print_string (Debug.string_of_eqs eqs);
-     print_newline();
      let s3 = squeeze_subst (unify eqs) in
      (s3, subst_type s3 ty, rel1 @ rel2)
   | (BinLogicOp (op, exp1, exp2), att_ty) ->
@@ -613,12 +714,16 @@ let rec ty_exp tyenv = function
        and case_tuple = function
            EmpT -> []
          | ConsT (exp, l) -> (gather_id_from_pattern exp) @ case_tuple l
+       and case_record = function
+           EmpR -> []
+         | ConsR ((_, exp), l) -> (gather_id_from_pattern exp) @ case_record l
        in
        match pattern with
        | (Var id, _) -> [id]
        | (ILit _, _) | (BLit _, _) | (SLit _, _) -> []
        | (Constr (_, None), _) -> []
        | (Constr (_, Some exp), _) -> gather_id_from_pattern exp
+       | (Record l, _) -> case_record l
        | (BinOp (Cons, exp1, exp2), _) -> (gather_id_from_pattern exp1) @ (gather_id_from_pattern exp2)
        | (ListExp l, _) -> case_list l
        | (TupleExp l, _) -> case_tuple l
@@ -685,8 +790,8 @@ let rec ty_exp tyenv = function
   | _ -> err ("not implemented yet")
 
 
-let ty_decl tyenv defenv' rev_defenv' decl =
-  defenv := defenv'; rev_defenv := rev_defenv';
+let ty_decl tyenv defenv' vardefenv' recdefenv' rev_defenv' decl =
+  defenv := defenv'; (*vardefenv := vardefenv';*) recdefenv := recdefenv'; rev_defenv := rev_defenv';
   match decl with
     Exp e ->
      let stringtyvar_to_inttyvar_list = make_Tyvar_to_TyVar_list e in

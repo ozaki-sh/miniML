@@ -1,0 +1,28 @@
+nameの集合からtyの候補を集める
+  候補が0 -> Error
+  候補が1 -> defenvから逆に過不足ないかをcheck
+    あり -> Error
+    なし -> 各fieldの型が確定したのでそれに基づいて型チェックをする
+  候補が複数 -> defenvから過不足ないやつを探す
+  　ない -> Error
+    1つある -> 各fieldの型が確定したのでそれに基づいて型チェックをする
+    複数ある -> 依存関係を記憶しながら複数の型を記憶しておく
+
+
+
+このnameのtyを得る
+1つ前までのtyとintersectionをとる
+  空 -> 1つ前までのtyの先頭のtyと今のnameでエラーを出す
+  それ以外 -> 続ける
+
+make_dependent
+　alpha beta [(betaの型, alphaの型);;;;]
+
+[Field (name, ty); ]
+
+this_tyの候補の集合でループを回す
+  this_tyの候補の実体でループを回す
+  　lの中にあるか探しに行く
+  　　ない -> false
+    　ある -> そのexpを評価して(s, ty)を得る
+    　　　　　　

@@ -8,3 +8,4 @@ val lookup : Syntax.id -> 'a t -> 'a
 val map : ('a -> 'b) -> 'a t -> 'b t
 val fold_right : ('a -> 'b -> 'b) -> 'a t -> 'b -> 'b
 val member : Syntax.id -> 'a t -> bool
+val partition : ('a -> bool) -> 'a t -> 'a t * 'a t
