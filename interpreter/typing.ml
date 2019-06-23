@@ -240,6 +240,7 @@ let rec get_attached_ty_list (exp, att_ty) =
     | Constr (_, None) -> []
     | Constr (_, Some exp) -> get_attached_ty_list exp
     | Record recordExp -> from_recordExp recordExp
+    | RecordWith (exp, recordExp) -> (get_attached_ty_list exp) @ (from_recordExp recordExp)
     | BinOp (_, exp1, exp2) -> (get_attached_ty_list exp1) @ (get_attached_ty_list exp2)
     | BinLogicOp (_, exp1, exp2) -> (get_attached_ty_list exp1) @ (get_attached_ty_list exp2)
     | IfExp (exp1, exp2, exp3) -> (get_attached_ty_list exp1) @ (get_attached_ty_list exp2) @ (get_attached_ty_list exp3)
@@ -251,6 +252,7 @@ let rec get_attached_ty_list (exp, att_ty) =
     | ListExp listExp -> from_listExp listExp
     | MatchExp (exp, l) -> (get_attached_ty_list exp) @ (from_exp_exp_list l)
     | TupleExp tupleExp -> from_tupleExp tupleExp
+    | RecordPattern recordExp -> from_recordExp recordExp
     | Wildcard -> []
   in
   (from_exp exp) @ att_ty
@@ -360,6 +362,7 @@ let rec transform exp_with_ty stv_to_itv_list =
       | Constr (id, None) -> Constr (id, None)
       | Constr (id, Some exp) -> Constr (id, Some (body_func exp))
       | Record recordExp -> Record (transform_recordExp recordExp)
+      | RecordWith (exp, recordExp) -> RecordWith (body_func exp, transform_recordExp recordExp)
       | BinOp (op, exp1, exp2) -> BinOp (op, body_func exp1, body_func exp2)
       | BinLogicOp (op, exp1, exp2) -> BinLogicOp (op, body_func exp1, body_func exp2)
       | IfExp (exp1, exp2, exp3) -> IfExp (body_func exp1, body_func exp2, body_func exp3)
@@ -371,6 +374,7 @@ let rec transform exp_with_ty stv_to_itv_list =
       | ListExp listExp -> ListExp (transform_listExp listExp)
       | MatchExp (l1, l2) -> MatchExp (body_func l1, transform_exp_exp_list l2)
       | TupleExp tupleExp -> TupleExp (transform_tupleExp tupleExp)
+      | RecordPattern recordExp -> RecordPattern (transform_recordExp recordExp)
       | Wildcard -> Wildcard
     in
     (transform_exp exp, transform_att_ty_list att_ty)
@@ -429,8 +433,73 @@ let ty_logic_prim op ty1 ty2 = match op with
     And -> ([(ty1, TyBool); (ty2, TyBool)], TyBool)
   | Or -> ([(ty1, TyBool); (ty2, TyBool)], TyBool)
 
+
+let rec get_candidates is_first candidates name_l = function
+    EmpR -> (MySet.to_list candidates, name_l)
+  | ConsR ((name, _), rest) ->
+     if List.mem name name_l then err ("The record field label " ^ name ^ " is defined several times")
+     else
+       (try
+          let this_ty_names = List.map (fun (_, this_ty_name) -> this_ty_name) (Rev_environment.lookup name !rev_defenv) in
+          if is_first then
+            get_candidates false (MySet.from_list this_ty_names) (name :: name_l) rest
+          else
+            let now_candidates = MySet.intersection (MySet.from_list this_ty_names) candidates in
+            if MySet.length now_candidates = 0 then
+              let this_ty_name = List.hd this_ty_names in
+                   let expected_ty_name = List.hd (MySet.to_list candidates) in
+                   err ("The record field " ^ name ^ " belongs to type " ^ this_ty_name ^ "\n"
+                        ^ "       but is mixed here with fields of type " ^ expected_ty_name)
+            else
+              get_candidates false now_candidates (name :: name_l) rest
+        with
+          Rev_environment.Not_bound -> err ("record field not bound: " ^ name))
+
+let rec filter_satisfied candidates name_l =
+  match candidates with
+    [] -> ([], "", 0)
+  | candidate :: rest ->
+     let name_l' = List.map (fun x -> match x with Field (n, _) -> n | _ -> "" (* nonsense *)) (Environment.lookup candidate !recdefenv) in
+     let name_set = MySet.from_list name_l in
+     let name_set' = MySet.from_list name_l' in
+     let diff_set = MySet.diff name_set' name_set in
+     let diff_set' = MySet.diff name_set name_set' in
+     if MySet.length diff_set = 0 && MySet.length diff_set' = 0 then
+       let (l', fo, fl) = filter_satisfied rest name_l in
+       (candidate :: l', fo, fl)
+     else if MySet.length diff_set != 0 then
+       let this_is_first_out = List.hd (MySet.to_list diff_set) in
+       let (l', _, _) = filter_satisfied rest name_l in
+       (l', this_is_first_out, 0)
+     else
+       let this_is_first_out = List.hd (MySet.to_list diff_set') in
+       let (l', _, _) = filter_satisfied rest name_l in
+       (l', this_is_first_out, 1)
+
+let rec make_name_beta_l = function
+    [] -> []
+  | name :: rest ->
+     let beta = fresh_tyvar () in
+     (name, beta) :: make_name_beta_l rest
+
+let rec make_subst_and_rel tyenv alpha this_ty_l name_beta_l = function
+    EmpR -> ([], [])
+  | ConsR ((name, exp), rest) ->
+     let (s, ty, rel) = ty_exp tyenv exp in
+     let (s', rel') = make_subst_and_rel tyenv alpha this_ty_l name_beta_l rest in
+     let beta = List.assoc name name_beta_l in
+     let l = List.map (fun (x, y) -> (x, TyRecord y)) (List.filter (fun (_, this_ty) -> List.mem this_ty this_ty_l) (Rev_environment.lookup name !rev_defenv)) in
+     let (field_ty_l, _) = List.split l in
+     let s'' =
+       if List.length l = 1 then
+         unify [(TyVar beta, List.hd field_ty_l); (TyVar beta, ty)]
+       else
+         unify [(TyVar beta, TySet (beta, MySet.from_list field_ty_l)); (TyVar beta, ty)] in
+     let rel'' = make_dependent_relation alpha beta l in
+     (s @ s'' @ s', rel @ rel'' @ rel)
+
 (* 値を返す前に型注釈に関してもチェックしている *)
-let rec ty_exp tyenv = function
+and ty_exp tyenv = function
     (Var x, att_ty) ->
      (try
         let TyScheme (vars, ty) = Environment.lookup x tyenv in
@@ -483,92 +552,18 @@ let rec ty_exp tyenv = function
       with
         Rev_environment.Not_bound -> err ("constructor not bound: " ^ name))
   | (Record l, att_ty) ->
-     let rec get_candidates is_first candidates name_l = function
-         EmpR -> (MySet.to_list candidates, name_l)
-       | ConsR ((name, _), rest) ->
-          if List.mem name name_l then err ("The record field label " ^ name ^ " is defined several times")
-          else
-            (try
-               let this_ty_names = List.map (fun (_, this_ty_name) -> this_ty_name) (Rev_environment.lookup name !rev_defenv) in
-               if is_first then
-                 get_candidates false (MySet.from_list this_ty_names) (name :: name_l) rest
-               else
-                 let now_candidates = MySet.intersection (MySet.from_list this_ty_names) candidates in
-                 if MySet.length now_candidates = 0 then
-                   let this_ty_name = List.hd this_ty_names in
-                   let expected_ty_name = List.hd (MySet.to_list candidates) in
-                   err ("The record field " ^ name ^ " belongs to type " ^ this_ty_name ^ "\n"
-                        ^ "but is mixed here with fields of type " ^ expected_ty_name)
-                 else
-                   get_candidates false now_candidates (name :: name_l) rest
-           with
-             Rev_environment.Not_bound -> err ("record field not bound: " ^ name))
-     and filter_satisfied candidates name_l first_out flag =
-       match candidates with
-         [] -> ([], first_out, flag)
-       | candidate :: rest ->
-          let name_l' = List.map (fun x -> match x with Field (n, _) -> n | _ -> "" (* nonsense *)) (Environment.lookup candidate !recdefenv) in
-          let name_set = MySet.from_list name_l in
-          let name_set' = MySet.from_list name_l' in
-          let diff_set = MySet.diff name_set' name_set in
-          let diff_set' = MySet.diff name_set name_set' in
-          if MySet.length diff_set = 0 && MySet.length diff_set' = 0 then
-            let (l', fo, fl) = filter_satisfied rest name_l first_out flag in
-            (candidate :: l', fo, fl)
-          else if MySet.length diff_set != 0 then
-            match first_out with
-               None ->
-                let this_is_first_out = Some (List.hd (MySet.to_list diff_set)) in
-                let (l', _, _) = filter_satisfied rest name_l this_is_first_out flag in
-                (l', this_is_first_out, 0)
-             | Some _ ->
-                let (l', _, _)=  filter_satisfied rest name_l first_out flag in
-                (l', first_out, 0)
-          else
-            match first_out with
-               None ->
-                let this_is_first_out = Some (List.hd (MySet.to_list diff_set')) in
-                let (l', _, _) = filter_satisfied rest name_l this_is_first_out flag in
-                (l', this_is_first_out, 1 )
-             | Some _ ->
-                let (l', _, _)=  filter_satisfied rest name_l first_out flag in
-                (l', first_out, 1)
-     and make_name_beta_l = function
-         [] -> []
-       | name :: rest ->
-          let beta = fresh_tyvar () in
-          (name, beta) :: make_name_beta_l rest
-     and make_subst_and_rel alpha this_ty_l name_beta_l = function
-         EmpR -> ([], [])
-       | ConsR ((name, exp), rest) ->
-          let (s, ty, rel) = ty_exp tyenv exp in
-          let (s', rel') = make_subst_and_rel alpha this_ty_l name_beta_l rest in
-          let beta = List.assoc name name_beta_l in
-          let l = List.map (fun (x, y) -> (x, TyRecord y)) (List.filter (fun (_, this_ty) -> List.mem this_ty this_ty_l) (Rev_environment.lookup name !rev_defenv)) in
-          let (field_ty_l, _) = List.split l in
-          let s'' =
-            if List.length l = 1 then
-              unify [(TyVar beta, List.hd field_ty_l); (TyVar beta, ty)]
-            else
-              unify [(TyVar beta, TySet (beta, MySet.from_list field_ty_l)); (TyVar beta, ty)] in
-          let rel'' = make_dependent_relation alpha beta l in
-          (s @ s'' @ s', rel @ rel'' @ rel)
-     in
      let (candidates, name_l) = get_candidates true MySet.empty [] l in
-     let (this_ty_l, first_out, flag) = filter_satisfied candidates name_l None 0 in
+     let (this_ty_l, first_out, flag) = filter_satisfied candidates name_l in
      if List.length this_ty_l = 0 then
-       match first_out with
-         None -> err ("For debug: record")
-       | Some name ->
-          if flag = 0 then
-            err ("Some record fields are undefined: " ^ name)
-          else
-            err ("record field not bound: " ^ name)
+       if flag = 0 then
+         err ("Some record fields are undefined: " ^ first_out)
+       else
+         err ("duplicately defined record type is mixed each other")
      else
        let alpha = fresh_tyvar () in
        let name_beta_l = make_name_beta_l name_l in
        let this_ty_set = MySet.from_list (List.map (fun x -> TyRecord x) this_ty_l) in
-       let (field_s, rel) = make_subst_and_rel alpha this_ty_l name_beta_l l in
+       let (field_s, rel) = make_subst_and_rel tyenv alpha this_ty_l name_beta_l l in
        let this_s =
          if MySet.length this_ty_set = 1 then
            [(alpha, (List.hd (MySet.to_list this_ty_set)))]
@@ -579,6 +574,23 @@ let rec ty_exp tyenv = function
        let eqs = field_eqs @ this_eqs @ make_eqs_about_att_ty (TyVar alpha) att_ty in
        let s = squeeze_subst (unify eqs) in
        (s, subst_type s (TyVar alpha), rel)
+  | (RecordWith (exp, l), att_ty) ->
+     let (s1, ty, rel1) = ty_exp tyenv exp in
+     let (candidates, name_l) = get_candidates true MySet.empty [] l in
+     let alpha = fresh_tyvar () in
+     let name_beta_l = make_name_beta_l name_l in
+     let this_ty_set = MySet.from_list (List.map (fun x -> TyRecord x) candidates) in
+     let (field_s, rel2) = make_subst_and_rel tyenv alpha candidates name_beta_l l in
+     let this_s =
+       if MySet.length this_ty_set = 1 then
+         [(alpha, (List.hd (MySet.to_list this_ty_set))); (alpha, ty)]
+       else
+         [(alpha, TySet (alpha, this_ty_set)); (alpha, ty)] in
+     let field_eqs = eqs_of_subst (squeeze_subst field_s) in
+     let this_eqs = eqs_of_subst (squeeze_subst this_s) in
+     let eqs = (eqs_of_subst s1) @ field_eqs @ this_eqs @ make_eqs_about_att_ty (TyVar alpha) att_ty in
+     let s2 = squeeze_subst (unify eqs) in
+     (s2, subst_type s2 (TyVar alpha), rel1 @ rel2)
   | (BinOp (op, exp1, exp2), att_ty) ->
      let (s1, ty1, rel1) = ty_exp tyenv exp1 in
      let (s2, ty2, rel2) = ty_exp tyenv exp2 in
@@ -723,10 +735,10 @@ let rec ty_exp tyenv = function
        | (ILit _, _) | (BLit _, _) | (SLit _, _) -> []
        | (Constr (_, None), _) -> []
        | (Constr (_, Some exp), _) -> gather_id_from_pattern exp
-       | (Record l, _) -> case_record l
        | (BinOp (Cons, exp1, exp2), _) -> (gather_id_from_pattern exp1) @ (gather_id_from_pattern exp2)
        | (ListExp l, _) -> case_list l
        | (TupleExp l, _) -> case_tuple l
+       | (RecordPattern l, _) -> case_record l
        | (Wildcard, _) -> []
        | _ -> err ("For debug: at gather_id_form_pattern")
      and check_whether_duplication checked_l id_l =
@@ -782,6 +794,22 @@ let rec ty_exp tyenv = function
      let eqs2 = (eqs_of_subst s2) @ (make_eqs_about_att_ty ty att_ty) in
      let s3 = squeeze_subst (unify eqs2) in
      (s3, subst_type s3 ty, rel)
+  | (RecordPattern l, att_ty) ->
+     let (candidates, name_l) = get_candidates true MySet.empty [] l in
+     let alpha = fresh_tyvar () in
+     let name_beta_l = make_name_beta_l name_l in
+     let this_ty_set = MySet.from_list (List.map (fun x -> TyRecord x) candidates) in
+     let (field_s, rel) = make_subst_and_rel tyenv alpha candidates name_beta_l l in
+     let this_s =
+       if MySet.length this_ty_set = 1 then
+         [(alpha, (List.hd (MySet.to_list this_ty_set)))]
+       else
+         [(alpha, TySet (alpha, this_ty_set))] in
+     let field_eqs = eqs_of_subst (squeeze_subst field_s) in
+     let this_eqs = eqs_of_subst this_s in
+     let eqs = field_eqs @ this_eqs @ make_eqs_about_att_ty (TyVar alpha) att_ty in
+     let s = squeeze_subst (unify eqs) in
+     (s, subst_type s (TyVar alpha), rel)
   | (Wildcard, att_ty) ->
      let ty = TyVar (fresh_tyvar ()) in
      let eqs = make_eqs_about_att_ty ty att_ty in

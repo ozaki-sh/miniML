@@ -144,6 +144,10 @@ FunInfixExpr :
 CnstrExpr :
     c=CNSTR { (Constr (c, None), []) }
   | c=CNSTR e=CnstrExpr { (Constr (c, Some e), []) }
+  | e=ProjExpr { e }
+
+ProjExpr :
+    e=ProjExpr DOT x=ID { (MatchExp (e, [((RecordPattern (ConsR ((x, (Var "_a", [])), EmpR)), []), (Var "_a", []))]), []) }
   | e=AExpr { e }
 
 AExpr :
@@ -155,6 +159,7 @@ AExpr :
   | LBOXBRA RBOXBRA  { (ListExp Emp, []) }
   | e=ListHeadExpr { (ListExp e, []) }
   | e=RecordHeadExpr { (Record e, []) }
+  | e=RecordWithHeadExpr { let (old, l) = e in (RecordWith (old, l), []) }
   | LPAREN e=Expr RPAREN { e }
   | LPAREN e=Expr COLON ty=TupleType RPAREN { let (e', l) = e in (e', ty :: l) }
 
@@ -174,6 +179,10 @@ RecordTailExpr :
 
 RecordExpr :
     x=ID EQ e=Expr { (x, e) }
+
+RecordWithHeadExpr :
+    LCLYBRA old=ProjExpr WITH e=RecordExpr lst=RecordTailExpr { (old, ConsR (e, lst)) }
+
 
 IfExpr :
     IF c=Expr THEN t=Expr ELSE e=Expr { (IfExp (c, t, e), []) }
@@ -267,7 +276,7 @@ APattern :
   | x=ID { (Var x, []) }
   | LBOXBRA RBOXBRA { (ListExp Emp, []) }
   | pt=ListHeadPattern { (ListExp pt, []) }
-  | pt=RecordHeadPattern { (Record pt, []) }
+  | pt=RecordHeadPattern { (RecordPattern pt, []) }
   | UNDERSCORE { (Wildcard, []) }
   | LPAREN pt=Pattern RPAREN { pt }
   | LPAREN pt=Pattern COLON ty=TupleType RPAREN { let (pt', l) = pt in (pt', ty :: l) }

@@ -56,7 +56,7 @@ let rec replace ty defenv =
      (try
         (match List.hd (Environment.lookup id defenv) with
            Constructor _ -> TyVariant id
-         | Field _ -> TyUser id)
+         | Field _ -> TyRecord id)
       with
         Environment.Not_bound -> err ("type not defined: " ^ id))
   | TyFun (domty, ranty) -> TyFun (replace domty defenv, replace ranty defenv)

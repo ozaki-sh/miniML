@@ -39,6 +39,7 @@ type exp =
   | SLit of string (* SLit "abc" --> "abc" *)
   | Constr of name * typedExp option (* Constr "A" (Some (ILit 1)) --> A 1 *)
   | Record of recordExp
+  | RecordWith of typedExp * recordExp
   | BinOp of binOp * typedExp * typedExp
   (* BinOp(Plus, ILit 4, Var "x") --> 4 + x *)
   | BinLogicOp of binLogicOp * typedExp * typedExp
@@ -68,6 +69,7 @@ type exp =
        0 -> 0
      | 1 -> 1 *)
   | TupleExp of tupleExp (* TupeExp (ConsT (ILit 3, ConsT (BLit true, EmpT))) --> (3, true) *)
+  | RecordPattern of recordExp
   | Wildcard (* Wildcard --> _ *)
 and listExp = Emp | Cons of typedExp * listExp
 and tupleExp = EmpT | ConsT of typedExp * tupleExp
@@ -209,6 +211,7 @@ let rec freevar_ty ty =
   | TyRecord x -> MySet.empty
   | TyNone _ -> MySet.empty
   | TySet _ -> MySet.empty
+             | TyUser x -> err ("here!")
   | _ -> err ("For debug: at freevar_ty")
 
 let freevar_tysc tysc =

@@ -81,6 +81,19 @@ let pp_val v = print_string (string_of_exval v)
 
 
 let rec pattern_match pattern value =
+  let rec assocList_of_recordval = function
+      EmpRV -> []
+    | ConsRV ((name, exval), rest) -> (name, exval) :: assocList_of_recordval rest
+  and case_record pt value_list =
+    match pt with
+      EmpR -> []
+    | ConsR ((name, (pt, _)), rest) ->
+       (try
+          let va = List.assoc name value_list in
+          pattern_match pt va @ case_record rest value_list
+        with
+          Not_found -> err ("For debug: at case_record in pattern_match"))
+  in
   match pattern, value with
     ILit i1, IntV i2 when (i1 = i2) -> []
   | BLit b1, BoolV b2 when (b1 = b2) -> []
@@ -89,9 +102,7 @@ let rec pattern_match pattern value =
   | Constr (name1, None), ConstrV (name2, None) when (name1 = name2) -> []
   | Constr (name1, Some (pt, _)), ConstrV (name2, Some v) when (name1 = name2) ->
      pattern_match pt v
-  | Record EmpR, RecordV EmpRV -> []
-  | Record (ConsR ((name1, (pt, _)), l1)), RecordV (ConsRV ((name2, v), l2)) ->
-     (pattern_match pt v) @ (pattern_match (Record l1) (RecordV l2))
+  | RecordPattern pt, RecordV l -> case_record pt (assocList_of_recordval l)
   | BinOp (Cons, (pt1, _), (pt2, _)), ListV (ConsV (v, l)) ->
      (pattern_match pt1 v) @ (pattern_match pt2 (ListV l))
   | ListExp Emp, ListV EmpV -> []
@@ -166,6 +177,27 @@ and eval_exp env = function
           ConsRV ((name, value), eval_record rest)
      in
      RecordV (eval_record rexp)
+  | RecordWith ((exp, _), rexp) ->
+     let rec assocList_of_recordval = function
+         EmpRV -> []
+       | ConsRV ((name, value), rest) -> (name, value) :: assocList_of_recordval rest
+     and replace old_recordval new_recordval_assoc_list =
+       match old_recordval with
+         EmpRV -> EmpRV
+       | ConsRV ((name, value), rest) ->
+          (try
+             let new_value = List.assoc name new_recordval_assoc_list in
+             ConsRV ((name, new_value), replace rest new_recordval_assoc_list)
+           with
+             Not_found -> ConsRV ((name, value), replace rest new_recordval_assoc_list))
+     in
+     let old_value = eval_exp env exp in
+     let new_value = eval_exp env (Record rexp) in
+     (match old_value, new_value with
+        RecordV old_recordval, RecordV new_recordval ->
+         let l = replace old_recordval (assocList_of_recordval new_recordval) in
+         RecordV l
+      | _ -> err ("For debug: at case RecordWith in eval_exp"))
   | BinOp (op, (exp1, _), (exp2, _)) ->
      let arg1 = eval_exp env exp1 in
      let arg2 = eval_exp env exp2 in
