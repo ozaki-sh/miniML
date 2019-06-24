@@ -67,7 +67,7 @@ let rec read_eval_print env tyenv defenv rev_defenv =
             Printf.printf "val %s : " id;
             pp_ty t;
             print_string " = ";
-            pp_val v;
+            pp_val v t defenv;
             print_newline();
             display rest
        in
@@ -169,7 +169,7 @@ let read_eval_print_from_file env tyenv defenv rev_defenv filename =
                     Printf.printf "val %s : " id;
                     pp_ty t;
                     print_string " = ";
-                    pp_val v;
+                    pp_val v t defenv;
                     print_newline();
                     display rest in
                display (List.rev once_list))

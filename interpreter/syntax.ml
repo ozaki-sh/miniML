@@ -94,6 +94,11 @@ type tysc = TyScheme of tyvar list * ty
 let tysc_of_ty ty = TyScheme ([], ty)
 
 
+let remove_index indexed_id =
+  let i = String.index indexed_id '#' in
+  String.sub indexed_id (i + 1) (String.length indexed_id - (i + 1))
+
+
 (* 0-25をa-zに変換する *)
 let alphabet_of_0to25 i =
   if i >= 0 && i <= 25 then Char.escaped (char_of_int (i + 97))
@@ -171,8 +176,8 @@ let rec string_of_ty ty =
         | _ -> (body_func ty) ^ " list")
     | TyTuple tytup -> string_of_tytuple tytup
     | TyUser x -> x
-    | TyVariant x -> x
-    | TyRecord x -> x
+    | TyVariant x -> remove_index x
+    | TyRecord x -> remove_index x
     | _ -> err ("For debug: at string_of_ty")
   in
   body_func ty
@@ -211,7 +216,6 @@ let rec freevar_ty ty =
   | TyRecord x -> MySet.empty
   | TyNone _ -> MySet.empty
   | TySet _ -> MySet.empty
-             | TyUser x -> err ("here!")
   | _ -> err ("For debug: at freevar_ty")
 
 let freevar_tysc tysc =
@@ -241,3 +245,7 @@ let string_of_defs ds =
      let str = List.fold_right (fun x y -> x ^ "; " ^ y) strdefs "" in
      "{ " ^ str ^ "}"
 let pp_defs ds = print_string (string_of_defs ds)
+
+
+
+

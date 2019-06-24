@@ -26,65 +26,81 @@ exception MatchError
 
 let err s = raise (Error s)
 
-let rec string_of_list l =
+let rec assocList_of_recordval = function
+    EmpRV -> []
+  | ConsRV ((name, exval), rest) -> (name, exval) :: assocList_of_recordval rest
+
+
+let rec string_of_list ty defenv l =
+  let ty' = match ty with TyList ty' -> ty' | _ -> TyInt (* nonsense *) in
   let rec inner_loop l =
     match l with
       EmpV -> "]"
-    | ConsV (head, tail) ->
-       "; " ^ (string_of_exval head) ^ (inner_loop tail)
+    | ConsV (head, rest) ->
+       "; " ^ (string_of_exval ty' defenv head) ^ (inner_loop rest)
   in
   let str = inner_loop l in
   let str_length = String.length str in
   if str_length <= 2 then "[]"
   else "[" ^ String.sub str 2 (str_length - 2)
 
-and string_of_tuple l =
-  let rec inner_loop l =
-    match l with
-      EmpTV -> ")"
-    | ConsTV (head, tail) ->
-       ", " ^ (string_of_exval head) ^ (inner_loop tail)
+and string_of_tuple ty defenv l =
+  let tytup = match ty with TyTuple tytup -> tytup | _ -> TyEmpT (* nonsense *) in
+  let rec inner_loop l tytup =
+    match l, tytup with
+      EmpTV, TyEmpT -> ")"
+    | ConsTV (head, rest1), TyConsT (ty', rest2) ->
+       ", " ^ (string_of_exval ty' defenv head) ^ (inner_loop rest1 rest2)
+    | _ -> err ("For debug: at string_of_tuple")
   in
-  let str = inner_loop l in
+  let str = inner_loop l tytup in
   let str_length = String.length str in
   "(" ^ String.sub str 2 (str_length - 2)
 
-and string_of_record l =
-  let rec inner_loop l =
-    match l with
-      EmpRV -> "}"
-    | ConsRV ((name, head), tail) ->
-       "; " ^ name ^ " = " ^ (string_of_exval head) ^ (inner_loop tail)
+and string_of_constr ty defenv name valueop =
+  match valueop with
+    None -> name
+  | Some v ->
+     let id = match ty with TyVariant x -> x | _ -> "" (* nonsense *) in
+     let body_l = List.map (fun x -> match x with Constructor (n, t) -> (n, t) | Field (n, t) -> (n, t) (* nonsense *)) (Environment.lookup id defenv) in
+     let ty' = List.assoc name body_l in
+     (match v with
+        ConstrV (_, Some _) -> name ^ " (" ^ (string_of_exval ty' defenv v) ^ ")"
+      | _ -> name ^ " " ^ (string_of_exval ty' defenv v))
+
+and string_of_record ty defenv l =
+  let id = match ty with TyRecord x -> x | _ -> "" (* nonsense *) in
+  let body_l = Environment.lookup id defenv in
+  let recordval_assoc_list = assocList_of_recordval l in
+  let rec inner_loop body_l =
+    match body_l with
+      [] -> "}"
+    | Field (name, ty') :: rest ->
+       "; " ^ name ^ " = " ^ (string_of_exval ty' defenv (List.assoc name recordval_assoc_list)) ^ (inner_loop rest)
+    | _ -> err ("For debug: at string_of_record")
   in
-  let str = inner_loop l in
+  let str = inner_loop body_l in
   let str_length = String.length str in
   "{" ^ String.sub str 2 (str_length - 2)
 
 (* pretty printing *)
-and string_of_exval = function
+and string_of_exval ty defenv = function
     IntV i -> string_of_int i
   | BoolV b -> string_of_bool b
   | StringV s -> "\"" ^ s ^ "\""
-  | ConstrV (name, None) -> name
-  | ConstrV (name, Some v) ->
-     (match v with
-        ConstrV (_, Some _) -> name ^ " (" ^ string_of_exval v ^ ")"
-      | _ -> name ^ " " ^ string_of_exval v)
-  | RecordV l -> string_of_record l
+  | ConstrV (name, valueop) -> string_of_constr ty defenv name valueop
+  | RecordV l -> string_of_record ty defenv l
   | ProcV (_, _, _) -> "<fun>"
   | DProcV (_, _) -> "<dfun>"
-  | ListV l -> string_of_list l
-  | TupleV l -> string_of_tuple l
+  | ListV l -> string_of_list ty defenv l
+  | TupleV l -> string_of_tuple ty defenv l
 
-let pp_val v = print_string (string_of_exval v)
+let pp_val v ty defenv = print_string (string_of_exval ty defenv v)
 
 
 
 let rec pattern_match pattern value =
-  let rec assocList_of_recordval = function
-      EmpRV -> []
-    | ConsRV ((name, exval), rest) -> (name, exval) :: assocList_of_recordval rest
-  and case_record pt value_list =
+  let rec case_record pt value_list =
     match pt with
       EmpR -> []
     | ConsR ((name, (pt, _)), rest) ->
@@ -108,10 +124,6 @@ let rec pattern_match pattern value =
   | ListExp Emp, ListV EmpV -> []
   | ListExp (Cons ((pt, _), l1)), ListV (ConsV (v, l2)) ->
      (pattern_match pt v) @ (pattern_match (ListExp l1) (ListV l2))
-  (*| ListExp (Cons ((pt, _), Emp)), ListV (ConsV (v, EmpV)) ->
-     pattern_match pt v
-  | ListExp (Cons ((pt1, _), Cons ((pt2, _), Emp))), ListV (ConsV (v, l)) ->
-     (pattern_match pt1 v) @ (pattern_match pt2 (ListV l))*)
   | TupleExp EmpT, TupleV EmpTV -> []
   | TupleExp (ConsT ((pt, _), l1)), TupleV (ConsTV (v, l2)) ->
      (pattern_match pt v) @ (pattern_match (TupleExp l1) (TupleV l2))

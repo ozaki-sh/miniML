@@ -134,12 +134,6 @@ let rec delete_TySet ty =
 let finalize_subst (s: subst) =
   List.map (fun (x, y) -> (x, delete_TySet y)) s
 
-(*let lift_up_TySet ty =
-  match ty with
-    TyFun (domty, ranty) ->
-  | TyList ty' ->
-  | TyTuple tytup ->*)
-
 
 let rec freevar_tyenv (tyenv : tyenv) =
   Environment.fold_right (fun x y -> MySet.union (freevar_tysc x) y) tyenv MySet.empty
@@ -168,43 +162,6 @@ let rec make_dependent_relation alpha beta l =
   | (arg_ty, this_ty) :: rest ->
      ((alpha, this_ty), (beta, arg_ty)) :: make_dependent_relation alpha beta rest
 
-(* (束縛すべき変数と型の組のリスト,型代入の集合,型注釈に関するeqsの集合)を返す *)
-let rec pattern_match (pattern, att_ty) ty =
-  let body_func pattern ty =
-    match pattern, ty with
-      ILit _, TyInt -> ([], [], [])
-    | ILit _, TyVar tyvar -> ([], [(tyvar, TyInt)], [])
-    | BLit _, TyBool -> ([], [], [])
-    | BLit _, TyVar tyvar -> ([], [(tyvar, TyBool)], [])
-    | SLit _, TyString -> ([], [], [])
-    | SLit _, TyVar tyvar -> ([], [(tyvar, TyString)], [])
-    | Var id, _ -> ([(id, ty)], [], [])
-    | ListExp Emp, TyList _ -> ([], [], [])
-    | ListExp Emp, TyVar tyvar -> ([], [(tyvar, TyList (TyVar (fresh_tyvar ())))], [])
-    | ListExp (Cons (pt, Emp)), TyList ty' -> pattern_match pt ty'
-    | ListExp (Cons (pt, Emp)), TyVar tyvar ->
-       let newTyVar = TyVar (fresh_tyvar ()) in
-       let (id_and_ty_list, subst_list, eqs) = pattern_match pt newTyVar in
-       (id_and_ty_list, (tyvar, TyList newTyVar) :: subst_list, eqs)
-    | ListExp (Cons (pt1, (Cons (pt2, Emp)))), TyList ty' ->
-       let (id_and_ty_list1, subst_list1, eqs1) = pattern_match pt1 ty' in
-       let (id_and_ty_list2, subst_list2, eqs2) = pattern_match pt2 ty in
-       (id_and_ty_list1 @ id_and_ty_list2, subst_list1 @ subst_list2, eqs1 @ eqs2)
-    | ListExp (Cons (pt1, (Cons (pt2, Emp)))), TyVar tyvar ->
-       let newTyVar = TyVar (fresh_tyvar ()) in
-       let (id_and_ty_list1, subst_list1, eqs1) = pattern_match pt1 newTyVar in
-       let (id_and_ty_list2, subst_list2, eqs2) = pattern_match pt2 ty in
-       (id_and_ty_list1 @ id_and_ty_list2, (tyvar, TyList newTyVar) :: (subst_list1 @ subst_list2), eqs1 @ eqs2)
-    | TupleExp EmpT, TyTuple TyEmpT -> ([], [], [])
-    | TupleExp (ConsT (pt, l)), TyTuple (TyConsT (ty, tytup)) ->
-       let (id_and_ty_list1, subst_list1, eqs1) = pattern_match pt ty in
-       let (id_and_ty_list2, subst_list2, eqs2) = pattern_match ((TupleExp l, [])) (TyTuple tytup) in
-       (id_and_ty_list1 @ id_and_ty_list2, subst_list1 @ subst_list2, eqs1 @ eqs2)
-    | Wildcard, _ -> ([], [], [])
-    | _ -> err ("expression must have same type as pattern")
-  in
-  let (id_and_ty_list, subst_list, eqs) = body_func pattern ty in
-  (id_and_ty_list, subst_list, (make_eqs_about_att_ty ty att_ty) @ eqs)
 
 (* match文において各パターンにマッチしたときの本体式の型が同じであることを表現するeqsを作るための関数 *)
 let rec make_ty_eqs_list = function
@@ -320,7 +277,7 @@ let rec transform exp_with_ty stv_to_itv_list =
     | TyTuple tytup -> TyTuple (transform_att_tytuple tytup)
     | TyUser x ->
        (try
-          let def = List.hd (Environment.lookup x !defenv) in
+          let def = List.hd (Environment.dlookup x !defenv) in
           (match def with
              Constructor _ -> TyVariant x
            | Field _ -> TyRecord x)
@@ -393,7 +350,7 @@ let rec transform_decl decl stv_to_itv_list =
     | TyTuple tytup -> TyTuple (transform_att_tytuple tytup)
     | TyUser x ->
        (try
-          let def = List.hd (Environment.lookup x !defenv) in
+          let def = List.hd (Environment.dlookup x !defenv) in
           (match def with
              Constructor _ -> TyVariant x
            | Field _ -> TyRecord x)
@@ -448,8 +405,8 @@ let rec get_candidates is_first candidates name_l = function
             if MySet.length now_candidates = 0 then
               let this_ty_name = List.hd this_ty_names in
                    let expected_ty_name = List.hd (MySet.to_list candidates) in
-                   err ("The record field " ^ name ^ " belongs to type " ^ this_ty_name ^ "\n"
-                        ^ "       but is mixed here with fields of type " ^ expected_ty_name)
+                   err ("The record field " ^ name ^ " belongs to type " ^ Syntax.remove_index (this_ty_name) ^ "\n"
+                        ^ "       but is mixed here with fields of type " ^ Syntax.remove_index (expected_ty_name))
             else
               get_candidates false now_candidates (name :: name_l) rest
         with
@@ -457,24 +414,19 @@ let rec get_candidates is_first candidates name_l = function
 
 let rec filter_satisfied candidates name_l =
   match candidates with
-    [] -> ([], "", 0)
+    [] -> ([], "")
   | candidate :: rest ->
      let name_l' = List.map (fun x -> match x with Field (n, _) -> n | _ -> "" (* nonsense *)) (Environment.lookup candidate !recdefenv) in
      let name_set = MySet.from_list name_l in
      let name_set' = MySet.from_list name_l' in
      let diff_set = MySet.diff name_set' name_set in
-     let diff_set' = MySet.diff name_set name_set' in
-     if MySet.length diff_set = 0 && MySet.length diff_set' = 0 then
-       let (l', fo, fl) = filter_satisfied rest name_l in
-       (candidate :: l', fo, fl)
-     else if MySet.length diff_set != 0 then
-       let this_is_first_out = List.hd (MySet.to_list diff_set) in
-       let (l', _, _) = filter_satisfied rest name_l in
-       (l', this_is_first_out, 0)
+     if MySet.length diff_set = 0 then
+       let (l', fo) = filter_satisfied rest name_l in
+       (candidate :: l', fo)
      else
-       let this_is_first_out = List.hd (MySet.to_list diff_set') in
-       let (l', _, _) = filter_satisfied rest name_l in
-       (l', this_is_first_out, 1)
+       let this_is_first_out = List.hd (MySet.to_list diff_set) in
+       let (l', _) = filter_satisfied rest name_l in
+       (l', this_is_first_out)
 
 let rec make_name_beta_l = function
     [] -> []
@@ -553,12 +505,9 @@ and ty_exp tyenv = function
         Rev_environment.Not_bound -> err ("constructor not bound: " ^ name))
   | (Record l, att_ty) ->
      let (candidates, name_l) = get_candidates true MySet.empty [] l in
-     let (this_ty_l, first_out, flag) = filter_satisfied candidates name_l in
+     let (this_ty_l, first_out) = filter_satisfied candidates name_l in
      if List.length this_ty_l = 0 then
-       if flag = 0 then
-         err ("Some record fields are undefined: " ^ first_out)
-       else
-         err ("duplicately defined record type is mixed each other")
+       err ("Some record fields are undefined: " ^ first_out)
      else
        let alpha = fresh_tyvar () in
        let name_beta_l = make_name_beta_l name_l in
@@ -583,9 +532,9 @@ and ty_exp tyenv = function
      let (field_s, rel2) = make_subst_and_rel tyenv alpha candidates name_beta_l l in
      let this_s =
        if MySet.length this_ty_set = 1 then
-         [(alpha, (List.hd (MySet.to_list this_ty_set))); (alpha, ty)]
+         unify [(TyVar alpha, (List.hd (MySet.to_list this_ty_set))); (TyVar alpha, ty)]
        else
-         [(alpha, TySet (alpha, this_ty_set)); (alpha, ty)] in
+         unify [(TyVar alpha, TySet (alpha, this_ty_set)); (TyVar alpha, ty)] in
      let field_eqs = eqs_of_subst (squeeze_subst field_s) in
      let this_eqs = eqs_of_subst (squeeze_subst this_s) in
      let eqs = (eqs_of_subst s1) @ field_eqs @ this_eqs @ make_eqs_about_att_ty (TyVar alpha) att_ty in

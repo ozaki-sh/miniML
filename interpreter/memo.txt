@@ -25,4 +25,19 @@ this_tyの候補の集合でループを回す
   　lの中にあるか探しに行く
   　　ない -> false
     　ある -> そのexpを評価して(s, ty)を得る
+
+
+
+
+Constr -> 
+Record -> ty -> lookup
+List -> TyList ty -> ty
+Tuple ->
+
+TyTuple (TyConsT (TyInt, TyConsT (TyRecord x, TyEmp)))
+
+ConstrV (Some (RecordV (...
+
+TyVariant x
+  Constructor (name, ty) ...
     　　　　　　

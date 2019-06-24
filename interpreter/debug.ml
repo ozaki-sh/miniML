@@ -34,6 +34,10 @@ and string_of_tupleExp = function
     EmpT -> "EmpT"
   | ConsT ((exp, _), l) -> "ConsT ((" ^ (string_of_exp exp) ^ "), (" ^ (string_of_tupleExp l) ^ "))"
 
+and string_of_recordExp = function
+    EmpR -> "EmpR"
+  | ConsR ((name, (exp, _)), l) -> "ConsR ((" ^ name ^ ", " ^ (string_of_exp exp) ^ "), (" ^ (string_of_recordExp l) ^ "))"
+
 and string_of_exp = function
     Var x -> "Var " ^ x
   | ILit i -> "ILit " ^ (string_of_int i)
@@ -43,6 +47,8 @@ and string_of_exp = function
      (match expop with
         None -> "Constr (" ^ id ^ ", None)"
       | Some (exp, _) -> "Constr (" ^ id ^ ", " ^ (string_of_exp exp) ^ ")")
+  | Record rexp -> "Record " ^ (string_of_recordExp rexp)
+  | RecordWith ((exp, _), rexp) -> "RecordWith (" ^ (string_of_exp exp) ^ ", " ^ (string_of_recordExp rexp)
   | BinOp (op, (exp1, _), (exp2, _)) ->
      "BinOp " ^ (string_of_binOp op) ^
        " (" ^ (string_of_exp exp1) ^ "), (" ^ (string_of_exp exp2) ^ ")"
@@ -69,6 +75,7 @@ and string_of_exp = function
      ^ (string_of_pattern_and_body_list pattern_and_body_list)
   | TupleExp texp ->
      "TupleExp " ^ (string_of_tupleExp texp)
+  | RecordPattern rexp -> "RecordPattern " ^ (string_of_recordExp rexp)
   | Wildcard -> "Wildcard"
 
 let rec string_of_tytuple = function
@@ -86,6 +93,7 @@ and string_of_tyrow = function
   | TyTuple tytup -> "TyTuple (" ^ string_of_tytuple tytup ^ ")"
   | TyUser id -> "TyUser " ^ id
   | TyVariant id -> "TyVariant " ^ id
+  | TyRecord id -> "TyRecord " ^ id
   | TyNone _ -> "TyNone"
   | TySet (tyvar, l) -> "TySet (" ^ (string_of_int tyvar) ^ ", " ^ (List.fold_left (fun x y -> x ^ "; " ^ y) "" ((List.map (fun x -> string_of_tyrow x) (MySet.to_list l)))) ^ ")"
 
