@@ -22,9 +22,9 @@ type ty =
   | TyFun of ty * ty
   | TyList of ty
   | TyTuple of tytuple
-  | TyUser of id
-  | TyVariant of id
-  | TyRecord of id
+  | TyUser of id * ty list
+  | TyVariant of id * ty list
+  | TyRecord of id * ty list
   | TyNone of name
   | TySet of tyvar * ty MySet.t
 and tytuple = TyEmpT | TyConsT of ty * tytuple
@@ -85,7 +85,7 @@ type program =
     Exp of typedExp
   | Decls of ((typedId * typedExp) list) list
   | RecDecls of ((typedId * typedExp) list) list
-  | TypeDecls of ((id * tydecl list) list) list
+  | TypeDecls of ((id * string list * tydecl list) list) list
 
 
 type tysc = TyScheme of tyvar list * ty
@@ -121,6 +121,12 @@ let make_tyvar_string_list ty =
     | TyConsT (ty, tytup') ->
        let ts_list' = body_func ty ts_list in
        case_tytuple tytup' ts_list'
+  and case_ty_list l ts_list =
+    match l with
+      [] -> []
+    | head :: rest ->
+       let ts_list' = body_func head ts_list in
+       case_ty_list rest ts_list'
   and body_func ty ts_list =
     let num = !counter in
     match ty with
@@ -136,9 +142,9 @@ let make_tyvar_string_list ty =
        ranty_ts_list
     | TyList ty' -> body_func ty' ts_list
     | TyTuple tytup  -> case_tytuple tytup ts_list
-    | TyUser x -> ts_list
-    | TyVariant x -> ts_list
-    | TyRecord x -> ts_list
+    | TyUser (_, l) -> case_ty_list l ts_list
+    | TyVariant (_, l) -> case_ty_list l ts_list
+    | TyRecord (_, l) -> case_ty_list l ts_list
     | _ -> err ("For debug: at make_tyvar_string_list")
   in
   body_func ty []
@@ -175,9 +181,9 @@ let rec string_of_ty ty =
         | TyTuple _  -> "(" ^ (body_func ty) ^ ")" ^ " list"
         | _ -> (body_func ty) ^ " list")
     | TyTuple tytup -> string_of_tytuple tytup
-    | TyUser x -> x
-    | TyVariant x -> remove_index x
-    | TyRecord x -> remove_index x
+    | TyUser (x, ty') -> x
+    | TyVariant (x, ty') -> remove_index x
+    | TyRecord (x, ty') -> remove_index x
     | _ -> err ("For debug: at string_of_ty")
   in
   body_func ty
@@ -203,6 +209,10 @@ let rec freevar_ty ty =
     match tytup with
       TyEmpT -> MySet.empty
     | TyConsT (ty, tytup') -> MySet.union (freevar_ty ty) (freevar_tytuple tytup')
+  and freevar_ty_list ty_list =
+    match ty_list with
+      [] -> MySet.empty
+    | head :: rest -> MySet.union (freevar_ty head) (freevar_ty_list rest)
   in
   match ty with
     TyInt
@@ -212,8 +222,8 @@ let rec freevar_ty ty =
   | TyFun (domty, ranty) -> MySet.union (freevar_ty domty) (freevar_ty ranty)
   | TyList ty -> freevar_ty ty
   | TyTuple tytup -> freevar_tytuple tytup
-  | TyVariant x -> MySet.empty
-  | TyRecord x -> MySet.empty
+  | TyVariant (_, l) -> freevar_ty_list l
+  | TyRecord (_, l) -> freevar_ty_list l
   | TyNone _ -> MySet.empty
   | TySet _ -> MySet.empty
   | _ -> err ("For debug: at freevar_ty")

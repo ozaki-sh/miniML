@@ -10,7 +10,7 @@ exception Not_exact_matched of (ty option * ty option)
 let err s = raise (Error s)
 
 let defenv = ref Environment.empty
-(*let vardefenv = ref Environment.empty*)
+let vardefenv = ref Environment.empty
 let recdefenv = ref Environment.empty
 let rev_defenv = ref Rev_environment.empty
 
@@ -55,8 +55,10 @@ let rec unify eqs =
       | TyTuple (TyConsT (_, _)), TyTuple TyEmpT -> raise TypeError
       | TyTuple (TyConsT (ty1', tytup1)), TyTuple (TyConsT (ty2', tytup2)) ->
          unify ((ty1', ty2') :: (TyTuple tytup1, TyTuple tytup2) :: rest)
-      | TyVariant name1, TyVariant name2 when name1 = name2 -> unify rest
-      | TyRecord name1, TyRecord name2 when name1 = name2 -> unify rest
+      | TyVariant (name1, tys1), TyVariant (name2, tys2) when name1 = name2 && List.length tys1 = List.length tys2 ->
+         unify ((List.combine tys1 tys2) @ rest)
+      | TyRecord (name1, tys1), TyRecord (name2, tys2) when name1 = name2 && List.length tys1 = List.length tys2->
+         unify ((List.combine tys1 tys2) @ rest)
       | TyVar alpha, _ ->
          if MySet.member alpha (freevar_ty ty2) then raise TypeError
          else (alpha, ty2) :: unify (subst_eqs [(alpha, ty2)] rest)
@@ -80,6 +82,7 @@ let rec unify eqs =
       | _, TySet (alpha, l2) ->
          if MySet.member ty1 l2 then (alpha, ty1) :: unify (subst_eqs [(alpha, ty1)] rest) else raise TypeError
       | _ -> raise TypeError)
+
 
 let rec reflect_dependency dependent_relation (s : subst) =
   match s with
@@ -275,12 +278,12 @@ let rec transform exp_with_ty stv_to_itv_list =
     | TyFun (domty, ranty) -> TyFun (transform_att_ty domty, transform_att_ty ranty)
     | TyList ty -> TyList (transform_att_ty ty)
     | TyTuple tytup -> TyTuple (transform_att_tytuple tytup)
-    | TyUser x ->
+    | TyUser (x, tys) ->
        (try
           let def = List.hd (Environment.dlookup x !defenv) in
           (match def with
-             Constructor _ -> TyVariant x
-           | Field _ -> TyRecord x)
+             Constructor _ -> TyVariant (x, transform_att_ty_list tys)
+           | Field _ -> TyRecord (x, transform_att_ty_list tys))
         with
           Environment.Not_bound -> err ("type not defined: " ^ x))
     | _ -> err ("For debug : at transform_att_ty")
@@ -348,12 +351,12 @@ let rec transform_decl decl stv_to_itv_list =
     | TyFun (domty, ranty) -> TyFun (transform_att_ty domty, transform_att_ty ranty)
     | TyList ty -> TyList (transform_att_ty ty)
     | TyTuple tytup -> TyTuple (transform_att_tytuple tytup)
-    | TyUser x ->
+    | TyUser (x, tys) ->
        (try
           let def = List.hd (Environment.dlookup x !defenv) in
           (match def with
-             Constructor _ -> TyVariant x
-           | Field _ -> TyRecord x)
+             Constructor _ -> TyVariant (x, transform_att_ty_list tys)
+           | Field _ -> TyRecord (x, transform_att_ty_list tys))
         with
           Environment.Not_bound -> err ("type not defined: " ^ x))
     | _ -> err ("For debug : at transform_decl")
@@ -367,6 +370,45 @@ let rec transform_decl decl stv_to_itv_list =
   match decl with
     [] -> []
   | ((id, att_ty), exp) :: rest -> ((id, transform_att_ty_list att_ty), transform exp stv_to_itv_list) :: transform_decl rest stv_to_itv_list
+
+
+let replace stv_to_itv_list ty =
+  let rec body_func = function
+      TyInt -> TyInt
+    | TyBool -> TyBool
+    | TyString -> TyString
+    | TyStringVar tyvar -> TyVar (List.assoc tyvar stv_to_itv_list)
+    | TyFun (domty, ranty) -> TyFun (body_func domty, body_func ranty)
+    | TyList ty' -> TyList (body_func ty')
+    | TyTuple tytup -> TyTuple (case_tytuple tytup)
+    | TyVariant (id, l) -> TyVariant (id, case_ty_list l)
+    | TyRecord (id, l) -> TyRecord (id, case_ty_list l)
+    | TyNone name -> TyNone name
+    | _ -> err ("For debug: at replace")
+  and case_tytuple = function
+      TyEmpT -> TyEmpT
+    | TyConsT (ty', tytup') ->
+       TyConsT (body_func ty', case_tytuple tytup')
+  and case_ty_list = function
+      [] -> []
+    | head :: rest ->
+       body_func head :: case_ty_list rest
+  in
+  body_func ty
+
+let reflect_param type_flag (arg_ty, this_ty_name) =
+  let env =
+    if type_flag = 0 then !vardefenv else !recdefenv in
+  let (params, _ ) = Environment.lookup this_ty_name env in
+  let tyvars = List.map (fun _ -> fresh_tyvar ()) params in
+  let tyVars = List.map (fun tv -> TyVar tv) tyvars in
+  let replaced_arg_ty = replace (List.combine params tyvars) arg_ty in
+  let this_ty =
+    if type_flag = 0 then
+      TyVariant (this_ty_name, tyVars)
+    else
+      TyRecord (this_ty_name, tyVars) in
+  (replaced_arg_ty, this_ty)
 
 
 
@@ -416,7 +458,8 @@ let rec filter_satisfied candidates name_l =
   match candidates with
     [] -> ([], "")
   | candidate :: rest ->
-     let name_l' = List.map (fun x -> match x with Field (n, _) -> n | _ -> "" (* nonsense *)) (Environment.lookup candidate !recdefenv) in
+     let (_, body_l) = Environment.lookup candidate !recdefenv in
+     let name_l' = List.map (fun x -> match x with Field (n, _) :: _  -> n | _ -> "" (* nonsense *)) body_l in
      let name_set = MySet.from_list name_l in
      let name_set' = MySet.from_list name_l' in
      let diff_set = MySet.diff name_set' name_set in
@@ -440,7 +483,7 @@ let rec make_subst_and_rel tyenv alpha this_ty_l name_beta_l = function
      let (s, ty, rel) = ty_exp tyenv exp in
      let (s', rel') = make_subst_and_rel tyenv alpha this_ty_l name_beta_l rest in
      let beta = List.assoc name name_beta_l in
-     let l = List.map (fun (x, y) -> (x, TyRecord y)) (List.filter (fun (_, this_ty) -> List.mem this_ty this_ty_l) (Rev_environment.lookup name !rev_defenv)) in
+     let l = List.map (reflect_param 1) (List.filter (fun (_, this_ty) -> List.mem this_ty this_ty_l) (Rev_environment.lookup name !rev_defenv)) in
      let (field_ty_l, _) = List.split l in
      let s'' =
        if List.length l = 1 then
@@ -475,7 +518,7 @@ and ty_exp tyenv = function
      (s, TyString, [])
   | (Constr (name, expop), att_ty) ->
      (try
-        let l = List.map (fun (x, y) -> (x, TyVariant y)) (Rev_environment.lookup name !rev_defenv) in
+        let l = List.map (reflect_param 0) (Rev_environment.lookup name !rev_defenv) in
         let (arg_ty_l, this_ty_l) = List.split l in
         let (s1, arg_ty, arg_rel) =
           match expop with
@@ -768,7 +811,7 @@ and ty_exp tyenv = function
 
 
 let ty_decl tyenv defenv' vardefenv' recdefenv' rev_defenv' decl =
-  defenv := defenv'; (*vardefenv := vardefenv';*) recdefenv := recdefenv'; rev_defenv := rev_defenv';
+  defenv := defenv'; vardefenv := vardefenv'; recdefenv := recdefenv'; rev_defenv := rev_defenv';
   match decl with
     Exp e ->
      let stringtyvar_to_inttyvar_list = make_Tyvar_to_TyVar_list e in

@@ -61,7 +61,7 @@ and string_of_constr ty defenv name valueop =
   match valueop with
     None -> name
   | Some v ->
-     let id = match ty with TyVariant x -> x | _ -> "" (* nonsense *) in
+     let id = match ty with TyVariant (x, _) -> x | _ -> "" (* nonsense *) in
      let body_l = List.map (fun x -> match x with Constructor (n, t) -> (n, t) | Field (n, t) -> (n, t) (* nonsense *)) (Environment.lookup id defenv) in
      let ty' = List.assoc name body_l in
      (match v with
@@ -69,7 +69,7 @@ and string_of_constr ty defenv name valueop =
       | _ -> name ^ " " ^ (string_of_exval ty' defenv v))
 
 and string_of_record ty defenv l =
-  let id = match ty with TyRecord x -> x | _ -> "" (* nonsense *) in
+  let id = match ty with TyRecord (x, _) -> x | _ -> "" (* nonsense *) in
   let body_l = Environment.lookup id defenv in
   let recordval_assoc_list = assocList_of_recordval l in
   let rec inner_loop body_l =

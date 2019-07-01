@@ -59,8 +59,8 @@ TypeDecl :
   | TYPE d=TypeAndDecl { [d] }
 
 TypeAndDecl :
-    x=ID EQ t=Type METAAND d=TypeAndDecl { (x, t) :: d }
-  | x=ID EQ t=Type { [(x, t)] }
+    tvs=option(Parameters) x=ID EQ t=Type METAAND d=TypeAndDecl { match tvs with None -> (x, [], t) :: d | Some tvs' -> (x, tvs', t) :: d }
+  | tvs=option(Parameters) x=ID EQ t=Type { match tvs with None -> [(x, [], t)] | Some tvs' -> [(x, tvs', t)] }
 
 
 Expr :
@@ -349,6 +349,22 @@ RecordTailType :
 RecordType :
     x=ID COLON ty=TupleType { Field (x, ty) }
 
+Parameters :
+    tv=TYVAR { [tv] }
+  | LPAREN tvs=ListedParameters RPAREN { tvs }
+
+ListedParameters :
+    tv=TYVAR { [tv] }
+  | tv=TYVAR COMMA tvs=ListedParameters { tv :: tvs }
+
+TypeParameters :
+    ty=TupleType { [ty] }
+  | LPAREN tys=ListedTypeParameters RPAREN { tys }
+
+ListedTypeParameters :
+    ty=TupleType { [ty] }
+  | ty=TupleType COMMA tys=ListedTypeParameters { ty :: tys }
+
 TupleTailType :
     MULT ty=TupleType { TyConsT (ty, TyEmpT) }
   | MULT ty1=TupleType ty2=TupleTailType { TyConsT (ty1, ty2) }
@@ -370,7 +386,8 @@ AType :
   | STRING { TyString }
   | tv=TYVAR { TyStringVar tv }
   | ty=AType LIST { TyList ty }
-  | x=ID { TyUser x }
+  | x=ID { TyUser (x, []) }
+  | tys=TypeParameters x=ID { TyUser (x, tys) }
   | LPAREN ty=TupleType RPAREN { ty }
 
 

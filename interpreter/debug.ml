@@ -91,15 +91,20 @@ and string_of_tyrow = function
   | TyFun (domty, ranty) -> "TyFun (" ^ (string_of_tyrow domty) ^ ", " ^ (string_of_tyrow ranty) ^ ")"
   | TyList ty -> "TyList " ^ (string_of_tyrow ty)
   | TyTuple tytup -> "TyTuple (" ^ string_of_tytuple tytup ^ ")"
-  | TyUser id -> "TyUser " ^ id
-  | TyVariant id -> "TyVariant " ^ id
-  | TyRecord id -> "TyRecord " ^ id
+  | TyUser (name, l) -> "TyUser " ^ name
+  | TyVariant (name, l) -> "TyVariant " ^ name
+  | TyRecord (name, l) -> "TyRecord " ^ name
   | TyNone _ -> "TyNone"
   | TySet (tyvar, l) -> "TySet (" ^ (string_of_int tyvar) ^ ", " ^ (List.fold_left (fun x y -> x ^ "; " ^ y) "" ((List.map (fun x -> string_of_tyrow x) (MySet.to_list l)))) ^ ")"
 
 let rec string_of_tydecl = function
     Constructor (name, ty) -> name ^ " of " ^ string_of_tyrow ty
   | Field (name, ty) -> name ^ " : " ^ string_of_tyrow ty
+
+let rec string_of_param = function
+    [] -> "]"
+  | head :: rest ->
+     head ^ "; " ^ string_of_param rest
 
 let string_of_decl = function
     Exp (exp, _) -> string_of_exp exp
@@ -127,19 +132,19 @@ let string_of_decl = function
          x ^ (List.fold_left
                 (fun s t -> s ^ t ^ "\n")
                 ""
-                (List.map (fun (id, tydecl) -> id ^ " <-def-> " ^ string_of_defs tydecl) y)) ^ "\n")
+                (List.map (fun (id, param, tydecl) -> id ^ " <-def-> " ^ "[" ^ string_of_param param ^ " " ^  string_of_defs tydecl) y)) ^ "\n")
        ""
        l
 
 
 let rec string_of_subst s =
-  List.fold_left
+  List.fold_right
     (fun x y -> x ^ "; " ^ y)
-    ""
     (List.map (fun (tyvar, ty) -> "(" ^ (string_of_int tyvar) ^ ", " ^ (string_of_tyrow ty) ^ ")") s)
+    ""
 
 let rec string_of_eqs eqs =
-  List.fold_left
+  List.fold_right
     (fun x y -> x ^ "; " ^ y)
-    ""
     (List.map (fun (ty1, ty2) -> "(" ^ (string_of_tyrow ty1) ^ ", " ^ (string_of_tyrow ty2) ^ ")") eqs)
+    ""
