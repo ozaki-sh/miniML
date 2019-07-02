@@ -24,9 +24,10 @@ let rec read_eval_print env tyenv defenv rev_defenv =
        let rec inner_display l is_first =
          match l with
            [] -> ()
-         | (name, body) :: rest ->
+         | (id, param, body) :: rest ->
             let pref = if is_first then "type" else "and" in
-            Printf.printf "%s %s = " pref name;
+            let str_param = string_of_param_decl param in
+            Printf.printf "%s %s %s = " pref str_param id;
             pp_defs body;
             print_newline();
             inner_display rest false
@@ -39,7 +40,7 @@ let rec read_eval_print env tyenv defenv rev_defenv =
        in
        outer_display l
     | _ ->
-       let (vardefenv, recdefenv) = Environment.partition (fun body_l -> match List.hd body_l with Constructor _ -> true | _ -> false) defenv in
+       let (vardefenv, recdefenv) = Environment.partition (fun (_, body_l) -> match List.hd body_l with Constructor _ -> true | _ -> false) defenv in
        let tys = ty_decl tyenv defenv vardefenv recdefenv rev_defenv decl in
        let decls = eval_decl env decl in
        let rec list_process exp_l ty_l env tyenv res_l =
@@ -126,9 +127,10 @@ let read_eval_print_from_file env tyenv defenv rev_defenv filename =
               let rec inner_display l is_first =
                 match l with
                   [] -> ()
-                | (name, body) :: rest ->
+                | (id, param, body) :: rest ->
                    let pref = if is_first then "type" else "and" in
-                   Printf.printf "%s %s = " pref name;
+                   let str_param = string_of_param_decl param in
+                   Printf.printf "%s %s %s = " pref str_param id;
                    pp_defs body;
                    print_newline();
                    inner_display rest false
@@ -141,7 +143,7 @@ let read_eval_print_from_file env tyenv defenv rev_defenv filename =
               in
               outer_display l
             | _ ->
-               let (vardefenv, recdefenv) = Environment.partition (fun body_l -> match List.hd body_l with Constructor _ -> true | _ -> false) defenv in
+               let (vardefenv, recdefenv) = Environment.partition (fun (_, body_l) -> match List.hd body_l with Constructor _ -> true | _ -> false) defenv in
                let tys = ty_decl tyenv defenv vardefenv recdefenv rev_defenv decl in
                let decls = eval_decl env decl in
                let rec list_process exp_l ty_l env tyenv res_l =
@@ -187,6 +189,16 @@ let read_eval_print_from_file env tyenv defenv rev_defenv filename =
     inner_loop env tyenv defenv rev_defenv (List.rev (get_str_list_by_semisemi 0 1 0 []))
 
 
+let option = "-1#option"
+
+let option_body =
+  let param = ["'a"] in
+  let body =
+    [Constructor ("None", TyNone "None");
+     Constructor ("Some", TyStringVar "'a")] in
+  (param, body)
+
+
 let initial_env =
   Environment.extend "i" (IntV 1)
     (Environment.extend "v" (IntV 5)
@@ -197,9 +209,12 @@ let initial_tyenv =
     (Environment.extend "v" (TyScheme ([], TyInt))
       (Environment.extend "x" (TyScheme ([], TyInt)) Environment.empty))
 
-let initial_defenv = Environment.empty
+let initial_defenv =
+  Environment.extend option option_body (Environment.empty)
 
-let initial_rev_defenv = Rev_environment.empty
+let initial_rev_defenv =
+  Rev_environment.extend "None" (TyNone "None", option)
+    (Rev_environment.extend "Some" (TyStringVar "'a", option) (Rev_environment.empty))
 
 let _ =
   try

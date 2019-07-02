@@ -30,6 +30,29 @@ let rec assocList_of_recordval = function
     EmpRV -> []
   | ConsRV ((name, exval), rest) -> (name, exval) :: assocList_of_recordval rest
 
+let replace param_ty_assoc_list ty =
+  let rec case_tytuple = function
+      TyEmpT -> TyEmpT
+    | TyConsT (ty', tytup') -> TyConsT (body_func ty', case_tytuple tytup')
+  and case_ty_list = function
+      [] -> []
+    | head :: rest -> body_func head :: case_ty_list rest
+  and body_func = function
+      TyInt -> TyInt
+    | TyBool -> TyBool
+    | TyString -> TyString
+    | TyVar tyvar -> TyVar tyvar
+    | TyStringVar tyvar -> List.assoc tyvar param_ty_assoc_list
+    | TyFun (domty, ranty) -> TyFun (body_func domty, body_func ranty)
+    | TyList ty' -> TyList (body_func ty')
+    | TyTuple tytup -> TyTuple (case_tytuple tytup)
+    | TyVariant (x, l) -> TyVariant (x, case_ty_list l)
+    | TyRecord (x, l) -> TyRecord (x, case_ty_list l)
+    | TyNone name -> TyNone name
+    | _ -> err ("For debug: at replace (eval.ml)")
+  in
+  body_func ty
+
 
 let rec string_of_list ty defenv l =
   let ty' = match ty with TyList ty' -> ty' | _ -> TyInt (* nonsense *) in
@@ -61,22 +84,25 @@ and string_of_constr ty defenv name valueop =
   match valueop with
     None -> name
   | Some v ->
-     let id = match ty with TyVariant (x, _) -> x | _ -> "" (* nonsense *) in
-     let body_l = List.map (fun x -> match x with Constructor (n, t) -> (n, t) | Field (n, t) -> (n, t) (* nonsense *)) (Environment.lookup id defenv) in
-     let ty' = List.assoc name body_l in
+     let (id, tys) = match ty with TyVariant (x, l) -> (x, l) | _ -> ("", []) (* nonsense *) in
+     let (param, body_l) = Environment.lookup id defenv in
+     let more_body_l = List.map (fun x -> match x with Constructor (n, t) -> (n, t) | Field (n, t) -> (n, t) (* nonsense *)) body_l in
+     let param_ty_assoc_list = List.combine param tys in
+     let ty' = replace param_ty_assoc_list (List.assoc name more_body_l) in
      (match v with
         ConstrV (_, Some _) -> name ^ " (" ^ (string_of_exval ty' defenv v) ^ ")"
       | _ -> name ^ " " ^ (string_of_exval ty' defenv v))
 
 and string_of_record ty defenv l =
-  let id = match ty with TyRecord (x, _) -> x | _ -> "" (* nonsense *) in
-  let body_l = Environment.lookup id defenv in
+  let (id, tys) = match ty with TyRecord (x, l) -> (x, l) | _ -> ("", []) (* nonsense *) in
+  let (param, body_l) = Environment.lookup id defenv in
+  let param_ty_assoc_list = List.combine param tys in
   let recordval_assoc_list = assocList_of_recordval l in
   let rec inner_loop body_l =
     match body_l with
       [] -> "}"
     | Field (name, ty') :: rest ->
-       "; " ^ name ^ " = " ^ (string_of_exval ty' defenv (List.assoc name recordval_assoc_list)) ^ (inner_loop rest)
+       "; " ^ name ^ " = " ^ (string_of_exval (replace param_ty_assoc_list ty') defenv (List.assoc name recordval_assoc_list)) ^ (inner_loop rest)
     | _ -> err ("For debug: at string_of_record")
   in
   let str = inner_loop body_l in

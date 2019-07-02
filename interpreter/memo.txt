@@ -42,4 +42,9 @@ TyVariant x
   Constructor (name, ty) ...
     　　　　　　
 
-arg_ty, this_ty
+(arg_ty, this_ty_name)
+this_ty_name -> stv_to_itv_list
+arg_ty -> replaced_arg_ty
+
+
+this_ty?

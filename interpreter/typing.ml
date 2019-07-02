@@ -2,6 +2,7 @@ open Syntax
 
 type subst = (tyvar * ty) list
 type tyenv = tysc Environment.t
+type defenv = (string list * tydecl list) Environment.t
 
 exception Error of string
 exception TypeError
@@ -9,8 +10,8 @@ exception Not_exact_matched of (ty option * ty option)
 
 let err s = raise (Error s)
 
-let defenv = ref Environment.empty
-let vardefenv = ref Environment.empty
+let (defenv : defenv ref) = ref Environment.empty
+let (vardefenv : defenv ref) = ref Environment.empty
 let recdefenv = ref Environment.empty
 let rev_defenv = ref Rev_environment.empty
 
@@ -19,12 +20,18 @@ let rec subst_type (subst : subst) t =
     match tytup with
       TyEmpT -> TyEmpT
     | TyConsT (ty', tytup') -> TyConsT (subst_one_type (tv, ty) ty', subst_tytuple (tv, ty) tytup')
+  and subst_ty_list (tv, ty) l =
+    match l with
+      [] -> []
+    | head :: rest -> subst_one_type (tv, ty) head :: subst_ty_list (tv, ty) rest
   and subst_one_type (tv, ty) t =
     match t with
       TyVar tv' when tv = tv' -> ty
     | TyFun (domty, ranty) -> TyFun (subst_one_type (tv, ty) domty, subst_one_type (tv, ty) ranty)
     | TyList ty' -> TyList (subst_one_type (tv, ty) ty')
     | TyTuple tytup -> TyTuple (subst_tytuple (tv, ty) tytup)
+    | TyVariant (x, l) -> TyVariant (x, subst_ty_list (tv, ty) l)
+    | TyRecord (x, l) -> TyRecord (x, subst_ty_list (tv, ty) l)
     | TySet (tv', l) when tv = tv' -> ty
     | _ -> t
   in
@@ -127,11 +134,17 @@ let rec delete_TySet ty =
     match tytup with
       TyEmpT -> TyEmpT
     | TyConsT (ty', tytup') -> TyConsT (delete_TySet ty', case_tytuple tytup')
+  and case_ty_list l =
+    match l with
+      [] -> []
+    | head :: rest -> delete_TySet head :: case_ty_list rest
   in
   match ty with
     TySet (_, l) -> List.hd (MySet.to_list l)
   | TyList ty -> TyList (delete_TySet ty)
   | TyTuple tytup -> TyTuple (case_tytuple tytup)
+  | TyVariant (x, l) -> TyVariant (x, case_ty_list l)
+  | TyRecord (x, l) -> TyRecord (x, case_ty_list l)
   | _ -> ty
 
 let finalize_subst (s: subst) =
@@ -232,7 +245,7 @@ let rec get_attached_tyvar_list = function
   | TyList ty -> get_attached_tyvar_list ty
   | TyTuple TyEmpT -> []
   | TyTuple (TyConsT (ty, tytup)) -> (get_attached_tyvar_list ty) @ (get_attached_tyvar_list (TyTuple tytup))
-  | TyUser _ -> []
+  | TyUser (_, l) -> List.concat (List.map get_attached_tyvar_list l)
   | _ -> err ("For debug : at get_attached_tyvar_list")
 
 (* attached_tyの型変数とtyの型変数の対応表を作る *)
@@ -280,10 +293,11 @@ let rec transform exp_with_ty stv_to_itv_list =
     | TyTuple tytup -> TyTuple (transform_att_tytuple tytup)
     | TyUser (x, tys) ->
        (try
-          let def = List.hd (Environment.dlookup x !defenv) in
-          (match def with
-             Constructor _ -> TyVariant (x, transform_att_ty_list tys)
-           | Field _ -> TyRecord (x, transform_att_ty_list tys))
+          let (_, def) = Environment.dlookup x !defenv in
+          let indexed_x = Environment.ilookup x !defenv in
+          (match List.hd def with
+             Constructor _ -> TyVariant (indexed_x, transform_att_ty_list tys)
+           | Field _ -> TyRecord (indexed_x, transform_att_ty_list tys))
         with
           Environment.Not_bound -> err ("type not defined: " ^ x))
     | _ -> err ("For debug : at transform_att_ty")
@@ -353,10 +367,11 @@ let rec transform_decl decl stv_to_itv_list =
     | TyTuple tytup -> TyTuple (transform_att_tytuple tytup)
     | TyUser (x, tys) ->
        (try
-          let def = List.hd (Environment.dlookup x !defenv) in
-          (match def with
-             Constructor _ -> TyVariant (x, transform_att_ty_list tys)
-           | Field _ -> TyRecord (x, transform_att_ty_list tys))
+          let (_, def) = Environment.dlookup x !defenv in
+          let indexed_x = Environment.ilookup x !defenv in
+          (match List.hd def with
+             Constructor _ -> TyVariant (indexed_x, transform_att_ty_list tys)
+           | Field _ -> TyRecord (indexed_x, transform_att_ty_list tys))
         with
           Environment.Not_bound -> err ("type not defined: " ^ x))
     | _ -> err ("For debug : at transform_decl")
@@ -395,20 +410,6 @@ let replace stv_to_itv_list ty =
        body_func head :: case_ty_list rest
   in
   body_func ty
-
-let reflect_param type_flag (arg_ty, this_ty_name) =
-  let env =
-    if type_flag = 0 then !vardefenv else !recdefenv in
-  let (params, _ ) = Environment.lookup this_ty_name env in
-  let tyvars = List.map (fun _ -> fresh_tyvar ()) params in
-  let tyVars = List.map (fun tv -> TyVar tv) tyvars in
-  let replaced_arg_ty = replace (List.combine params tyvars) arg_ty in
-  let this_ty =
-    if type_flag = 0 then
-      TyVariant (this_ty_name, tyVars)
-    else
-      TyRecord (this_ty_name, tyVars) in
-  (replaced_arg_ty, this_ty)
 
 
 
@@ -459,7 +460,7 @@ let rec filter_satisfied candidates name_l =
     [] -> ([], "")
   | candidate :: rest ->
      let (_, body_l) = Environment.lookup candidate !recdefenv in
-     let name_l' = List.map (fun x -> match x with Field (n, _) :: _  -> n | _ -> "" (* nonsense *)) body_l in
+     let name_l' = List.map (fun x -> match x with Field (n, _) -> n | _ -> "" (* nonsense *)) body_l in
      let name_set = MySet.from_list name_l in
      let name_set' = MySet.from_list name_l' in
      let diff_set = MySet.diff name_set' name_set in
@@ -477,13 +478,26 @@ let rec make_name_beta_l = function
      let beta = fresh_tyvar () in
      (name, beta) :: make_name_beta_l rest
 
-let rec make_subst_and_rel tyenv alpha this_ty_l name_beta_l = function
+let rec make_this_ty_assoc_list = function
+    [] -> []
+  | head :: rest ->
+     let (params, _) = Environment.lookup head !recdefenv in
+     let tyvars = List.map (fun _ -> fresh_tyvar ()) params in
+     (head, List.combine params tyvars) :: make_this_ty_assoc_list rest
+
+let rec make_subst_and_rel tyenv alpha this_ty_l this_ty_assoc_list name_beta_l = function
     EmpR -> ([], [])
   | ConsR ((name, exp), rest) ->
      let (s, ty, rel) = ty_exp tyenv exp in
-     let (s', rel') = make_subst_and_rel tyenv alpha this_ty_l name_beta_l rest in
+     let (s', rel') = make_subst_and_rel tyenv alpha this_ty_l this_ty_assoc_list name_beta_l rest in
      let beta = List.assoc name name_beta_l in
-     let l = List.map (reflect_param 1) (List.filter (fun (_, this_ty) -> List.mem this_ty this_ty_l) (Rev_environment.lookup name !rev_defenv)) in
+     let f (arg_ty, this_ty_name) =
+       let stv_to_itv_list = List.assoc this_ty_name this_ty_assoc_list in
+       let replaced_arg_ty = replace stv_to_itv_list arg_ty in
+       let (_, tyvars) = List.split stv_to_itv_list in
+       let tyVars = List.map (fun tyvar -> TyVar tyvar) tyvars in
+       (replaced_arg_ty, TyRecord (this_ty_name, tyVars)) in
+     let l = List.map f (List.filter (fun (_, this_ty) -> List.mem this_ty this_ty_l) (Rev_environment.lookup name !rev_defenv)) in
      let (field_ty_l, _) = List.split l in
      let s'' =
        if List.length l = 1 then
@@ -518,7 +532,13 @@ and ty_exp tyenv = function
      (s, TyString, [])
   | (Constr (name, expop), att_ty) ->
      (try
-        let l = List.map (reflect_param 0) (Rev_environment.lookup name !rev_defenv) in
+        let f (arg_ty, this_ty_name) =
+          let (params, _) = Environment.lookup this_ty_name !vardefenv in
+          let tyvars = List.map (fun _ -> fresh_tyvar ()) params in
+          let tyVars = List.map (fun tyvar -> TyVar tyvar) tyvars in
+          let replaced_arg_ty = replace (List.combine params tyvars) arg_ty in
+          (replaced_arg_ty, TyVariant (this_ty_name, tyVars)) in
+        let l = List.map f (Rev_environment.lookup name !rev_defenv) in
         let (arg_ty_l, this_ty_l) = List.split l in
         let (s1, arg_ty, arg_rel) =
           match expop with
@@ -554,8 +574,14 @@ and ty_exp tyenv = function
      else
        let alpha = fresh_tyvar () in
        let name_beta_l = make_name_beta_l name_l in
-       let this_ty_set = MySet.from_list (List.map (fun x -> TyRecord x) this_ty_l) in
-       let (field_s, rel) = make_subst_and_rel tyenv alpha this_ty_l name_beta_l l in
+       let this_ty_assoc_list = make_this_ty_assoc_list this_ty_l in
+       let f this_ty_name =
+         let stv_to_itv_list = List.assoc this_ty_name this_ty_assoc_list in
+         let (_, tyvars) = List.split stv_to_itv_list in
+         let tyVars = List.map (fun tyvar -> TyVar tyvar) tyvars in
+         TyRecord (this_ty_name, tyVars) in
+       let this_ty_set = MySet.from_list (List.map f this_ty_l) in
+       let (field_s, rel) = make_subst_and_rel tyenv alpha this_ty_l this_ty_assoc_list name_beta_l l in
        let this_s =
          if MySet.length this_ty_set = 1 then
            [(alpha, (List.hd (MySet.to_list this_ty_set)))]
@@ -571,8 +597,14 @@ and ty_exp tyenv = function
      let (candidates, name_l) = get_candidates true MySet.empty [] l in
      let alpha = fresh_tyvar () in
      let name_beta_l = make_name_beta_l name_l in
-     let this_ty_set = MySet.from_list (List.map (fun x -> TyRecord x) candidates) in
-     let (field_s, rel2) = make_subst_and_rel tyenv alpha candidates name_beta_l l in
+     let this_ty_assoc_list = make_this_ty_assoc_list candidates in
+     let f this_ty_name =
+       let stv_to_itv_list = List.assoc this_ty_name this_ty_assoc_list in
+       let (_, tyvars) = List.split stv_to_itv_list in
+       let tyVars = List.map (fun tyvar -> TyVar tyvar) tyvars in
+       TyRecord (this_ty_name, tyVars) in
+     let this_ty_set = MySet.from_list (List.map f candidates) in
+     let (field_s, rel2) = make_subst_and_rel tyenv alpha candidates this_ty_assoc_list name_beta_l l in
      let this_s =
        if MySet.length this_ty_set = 1 then
          unify [(TyVar alpha, (List.hd (MySet.to_list this_ty_set))); (TyVar alpha, ty)]
@@ -790,8 +822,14 @@ and ty_exp tyenv = function
      let (candidates, name_l) = get_candidates true MySet.empty [] l in
      let alpha = fresh_tyvar () in
      let name_beta_l = make_name_beta_l name_l in
-     let this_ty_set = MySet.from_list (List.map (fun x -> TyRecord x) candidates) in
-     let (field_s, rel) = make_subst_and_rel tyenv alpha candidates name_beta_l l in
+      let this_ty_assoc_list = make_this_ty_assoc_list candidates in
+      let f this_ty_name =
+        let stv_to_itv_list = List.assoc this_ty_name this_ty_assoc_list in
+        let (_, tyvars) = List.split stv_to_itv_list in
+        let tyVars = List.map (fun tyvar -> TyVar tyvar) tyvars in
+        TyRecord (this_ty_name, tyVars) in
+     let this_ty_set = MySet.from_list (List.map f candidates) in
+     let (field_s, rel) = make_subst_and_rel tyenv alpha candidates this_ty_assoc_list name_beta_l l in
      let this_s =
        if MySet.length this_ty_set = 1 then
          [(alpha, (List.hd (MySet.to_list this_ty_set)))]

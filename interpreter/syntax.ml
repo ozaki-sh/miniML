@@ -123,7 +123,7 @@ let make_tyvar_string_list ty =
        case_tytuple tytup' ts_list'
   and case_ty_list l ts_list =
     match l with
-      [] -> []
+      [] -> ts_list
     | head :: rest ->
        let ts_list' = body_func head ts_list in
        case_ty_list rest ts_list'
@@ -136,6 +136,7 @@ let make_tyvar_string_list ty =
     | TyVar tyvar ->
        if List.mem_assoc tyvar ts_list then ts_list
        else (counter := num + 1; (tyvar, string_of_num num) :: ts_list)
+    | TyStringVar tyvar -> ts_list (* これは型宣言の時しか呼ばれない *)
     | TyFun (domty, ranty) ->
        let domty_ts_list = body_func domty ts_list in
        let ranty_ts_list = body_func ranty domty_ts_list in
@@ -170,6 +171,7 @@ let rec string_of_ty ty =
     | TyBool -> "bool"
     | TyString -> "string"
     | TyVar tyvar -> List.assoc tyvar tyvar_string_list
+    | TyStringVar tyvar -> tyvar (* これは型宣言の時しか呼ばれない *)
     | TyFun (domty, ranty) ->
        (match domty with
           TyFun _
@@ -181,14 +183,30 @@ let rec string_of_ty ty =
         | TyTuple _  -> "(" ^ (body_func ty) ^ ")" ^ " list"
         | _ -> (body_func ty) ^ " list")
     | TyTuple tytup -> string_of_tytuple tytup
-    | TyUser (x, ty') -> x
-    | TyVariant (x, ty') -> remove_index x
-    | TyRecord (x, ty') -> remove_index x
+    | TyUser (x, l) ->
+       if List.length l = 0 then x
+       else string_of_param l ^ " " ^ x
+    | TyVariant (x, l) ->
+       if List.length l = 0 then remove_index x
+       else string_of_param l ^ " " ^ remove_index x
+    | TyRecord (x, l) ->
+       if List.length l = 0 then remove_index x
+       else string_of_param l ^ " " ^ remove_index x
     | _ -> err ("For debug: at string_of_ty")
   in
   body_func ty
 
-
+and string_of_param param =
+  let rec inner_loop = function
+      [] -> ")"
+    | head :: rest ->
+       ", " ^ string_of_ty head ^ inner_loop rest
+  in
+  if List.length param = 1 then
+    string_of_ty (List.hd param)
+  else
+    let str = inner_loop param in
+    "(" ^ String.sub str 2 (String.length str - 2)
 
 (* pretty printing *)
 let pp_ty ty = print_string (string_of_ty ty)
@@ -258,4 +276,16 @@ let pp_defs ds = print_string (string_of_defs ds)
 
 
 
-
+let string_of_param_decl param =
+  let rec inner_loop = function
+      [] -> ")"
+    | head :: rest ->
+       ", " ^ head ^ inner_loop rest
+  in
+  if List.length param = 0 then
+    ""
+  else if List.length param = 1 then
+    List.hd param
+  else
+    let str = inner_loop param in
+    "(" ^ String.sub str 2 (String.length str - 2)

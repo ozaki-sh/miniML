@@ -82,6 +82,20 @@ let rec string_of_tytuple = function
     TyEmpT -> ""
   | TyConsT (ty, tytup) -> string_of_tyrow ty ^ ", " ^ string_of_tytuple tytup
 
+and string_of_ty_list l =
+  let rec inner_loop = function
+    [] -> "]"
+  | head :: rest ->
+     ", " ^ string_of_tyrow head ^ inner_loop rest
+  in
+  if List.length l = 0 then
+    "[]"
+  else if List.length l = 1 then
+    "[" ^ string_of_tyrow (List.hd l) ^ "]"
+  else
+    let str = inner_loop l in
+    "[" ^ String.sub str 2 (String.length str - 2)
+
 and string_of_tyrow = function
     TyInt -> "TyInt"
   | TyBool -> "TyBool"
@@ -91,9 +105,9 @@ and string_of_tyrow = function
   | TyFun (domty, ranty) -> "TyFun (" ^ (string_of_tyrow domty) ^ ", " ^ (string_of_tyrow ranty) ^ ")"
   | TyList ty -> "TyList " ^ (string_of_tyrow ty)
   | TyTuple tytup -> "TyTuple (" ^ string_of_tytuple tytup ^ ")"
-  | TyUser (name, l) -> "TyUser " ^ name
-  | TyVariant (name, l) -> "TyVariant " ^ name
-  | TyRecord (name, l) -> "TyRecord " ^ name
+  | TyUser (name, l) -> "TyUser (" ^ name ^ ", " ^ string_of_ty_list l ^ ")"
+  | TyVariant (name, l) -> "TyVariant (" ^ name ^ ", " ^ string_of_ty_list l ^ ")"
+  | TyRecord (name, l) -> "TyRecord (" ^ name ^ ", " ^ string_of_ty_list l ^ ")"
   | TyNone _ -> "TyNone"
   | TySet (tyvar, l) -> "TySet (" ^ (string_of_int tyvar) ^ ", " ^ (List.fold_left (fun x y -> x ^ "; " ^ y) "" ((List.map (fun x -> string_of_tyrow x) (MySet.to_list l)))) ^ ")"
 
