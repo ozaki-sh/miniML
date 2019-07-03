@@ -25,9 +25,10 @@ let rec read_eval_print env tyenv defenv rev_defenv =
          match l with
            [] -> ()
          | (id, param, body) :: rest ->
-            let pref = if is_first then "type" else "and" in
+            let pref = if is_first then "type " else "and " in
             let str_param = string_of_param_decl param in
-            Printf.printf "%s %s %s = " pref str_param id;
+            let str = pref ^ str_param ^ id ^ " = " in
+            print_string str;
             pp_defs body;
             print_newline();
             inner_display rest false
@@ -128,9 +129,10 @@ let read_eval_print_from_file env tyenv defenv rev_defenv filename =
                 match l with
                   [] -> ()
                 | (id, param, body) :: rest ->
-                   let pref = if is_first then "type" else "and" in
+                   let pref = if is_first then "type " else "and " in
                    let str_param = string_of_param_decl param in
-                   Printf.printf "%s %s %s = " pref str_param id;
+                   let str = pref ^ str_param ^ id ^ " = " in
+                   print_string str;
                    pp_defs body;
                    print_newline();
                    inner_display rest false

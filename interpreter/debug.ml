@@ -86,7 +86,7 @@ and string_of_ty_list l =
   let rec inner_loop = function
     [] -> "]"
   | head :: rest ->
-     ", " ^ string_of_tyrow head ^ inner_loop rest
+     "; " ^ string_of_tyrow head ^ inner_loop rest
   in
   if List.length l = 0 then
     "[]"
@@ -113,7 +113,9 @@ and string_of_tyrow = function
 
 let rec string_of_tydecl = function
     Constructor (name, ty) -> name ^ " of " ^ string_of_tyrow ty
-  | Field (name, ty) -> name ^ " : " ^ string_of_tyrow ty
+  | Field (name, ty, mutability) ->
+     let mut = match mutability with Mutable -> "mutable " | Immutable -> "" in
+     mut ^ name ^ " : " ^ string_of_tyrow ty
 
 let rec string_of_param = function
     [] -> "]"

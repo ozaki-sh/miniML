@@ -77,9 +77,11 @@ and recordExp = EmpR | ConsR of (name * typedExp) * recordExp
 (* 型注釈付きの式を表す型 *)
 and typedExp = exp * ty list
 
+type mutability = Mutable | Immutable
+
 type tydecl =
     Constructor of name * ty
-  | Field of name * ty
+  | Field of name * ty * mutability
 
 type program =
     Exp of typedExp
@@ -165,6 +167,17 @@ let rec string_of_ty ty =
     let str = inner_loop tytup in
     let str_length = String.length str in
     String.sub str 0 (str_length - 3)
+  and string_of_param param =
+    let rec inner_loop = function
+        [] -> ")"
+      | head :: rest ->
+         ", " ^ body_func head ^ inner_loop rest
+    in
+    if List.length param = 1 then
+      string_of_ty (List.hd param)
+    else
+      let str = inner_loop param in
+      "(" ^ String.sub str 2 (String.length str - 2)
   and body_func ty =
     match ty with
       TyInt -> "int"
@@ -196,17 +209,6 @@ let rec string_of_ty ty =
   in
   body_func ty
 
-and string_of_param param =
-  let rec inner_loop = function
-      [] -> ")"
-    | head :: rest ->
-       ", " ^ string_of_ty head ^ inner_loop rest
-  in
-  if List.length param = 1 then
-    string_of_ty (List.hd param)
-  else
-    let str = inner_loop param in
-    "(" ^ String.sub str 2 (String.length str - 2)
 
 (* pretty printing *)
 let pp_ty ty = print_string (string_of_ty ty)
@@ -260,8 +262,9 @@ let string_of_def d =
      (match ty with
         TyNone _ -> id
       | _ -> id ^ " of " ^ (string_of_ty ty))
-  | Field (id, ty) ->
-     id ^ " : " ^ (string_of_ty ty)
+  | Field (id, ty, mutability) ->
+     let mut = match mutability with Mutable -> "mutable " | Immutable -> "" in
+     mut ^ id ^ " : " ^ (string_of_ty ty)
 
 let string_of_defs ds =
   let strdefs = List.map string_of_def ds in
@@ -285,7 +288,7 @@ let string_of_param_decl param =
   if List.length param = 0 then
     ""
   else if List.length param = 1 then
-    List.hd param
+    List.hd param ^ " "
   else
     let str = inner_loop param in
-    "(" ^ String.sub str 2 (String.length str - 2)
+    "(" ^ String.sub str 2 (String.length str - 2) ^ " "

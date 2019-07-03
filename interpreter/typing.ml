@@ -460,7 +460,7 @@ let rec filter_satisfied candidates name_l =
     [] -> ([], "")
   | candidate :: rest ->
      let (_, body_l) = Environment.lookup candidate !recdefenv in
-     let name_l' = List.map (fun x -> match x with Field (n, _) -> n | _ -> "" (* nonsense *)) body_l in
+     let name_l' = List.map (fun x -> match x with Field (n, _, _) -> n | _ -> "" (* nonsense *)) body_l in
      let name_set = MySet.from_list name_l in
      let name_set' = MySet.from_list name_l' in
      let diff_set = MySet.diff name_set' name_set in

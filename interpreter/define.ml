@@ -38,7 +38,7 @@ let rec get_name_and_tyvar_list = function
      let (name_l, tyvars) = get_name_and_tyvar_list rest in
      (match head with
         Constructor (name, ty) -> (name :: name_l, get_tyvar_list ty @ tyvars)
-      | Field (name, ty) -> (name :: name_l, get_tyvar_list ty @ tyvars))
+      | Field (name, ty, _) -> (name :: name_l, get_tyvar_list ty @ tyvars))
 
 
  let rec check_whether_duplication l =
@@ -88,7 +88,7 @@ let rec bind_rev_defenv l rev_defenv =
     | Constructor (name, ty) :: rest ->
        let newrev_defenv' = Rev_environment.extend name (ty, id) rev_defenv' in
        inner_loop id rest newrev_defenv'
-    | Field (name, ty) :: rest ->
+    | Field (name, ty, _) :: rest ->
        let newrev_defenv' = Rev_environment.extend name (ty, id) rev_defenv' in
        inner_loop id rest newrev_defenv'
   in
@@ -113,7 +113,7 @@ let rec def_decl defenv rev_defenv = function
                         (id, param, (List.map
                                 (fun z -> match z with
                                             Constructor (name, ty) -> Constructor (name, replace ty defenv')
-                                          | Field (name, ty) -> Field (name, replace ty defenv'))
+                                          | Field (name, ty, mutability) -> Field (name, replace ty defenv', mutability))
                                 body_l))) all_l in
                   let newdefenv = bind_defenv replaced_l !defenv in
                   let newrev_defenv = bind_rev_defenv replaced_l !rev_defenv in

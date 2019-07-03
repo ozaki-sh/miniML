@@ -14,7 +14,7 @@ open Syntax
 %token COMMA UNDERSCORE
 %token COLON
 %token INT BOOL STRING LIST
-%token LCLYBRA RCLYBRA DOT
+%token LCLYBRA RCLYBRA DOT MUTABLE
 %token REF COLONEQ EXCLM
 %token TYPE OF
 
@@ -347,7 +347,8 @@ RecordTailType :
   | option(SEMI) RCLYBRA { [] }
 
 RecordType :
-    x=ID COLON ty=TupleType { Field (x, ty) }
+    x=ID COLON ty=TupleType { Field (x, ty, Immutable) }
+  | MUTABLE x=ID COLON ty=TupleType { Field (x, ty, Mutable) }
 
 Parameters :
     tv=TYVAR { [tv] }

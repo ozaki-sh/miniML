@@ -1,4 +1,3 @@
-type 'a a = {x:'a};;
+type ('a, 'b) a = A;;
 
-({x=5}:int a);;
-({x=5}:'a a);;
+A;;

@@ -13,6 +13,7 @@ let reservedWords = [
   ("let", Parser.LET);
   ("list", Parser.LIST);
   ("match", Parser.MATCH);
+  ("mutable", Parser.MUTABLE);
   ("of", Parser.OF);
   ("rec", Parser.REC);
   ("ref", Parser.REF);

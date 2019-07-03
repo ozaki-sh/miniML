@@ -86,7 +86,7 @@ and string_of_constr ty defenv name valueop =
   | Some v ->
      let (id, tys) = match ty with TyVariant (x, l) -> (x, l) | _ -> ("", []) (* nonsense *) in
      let (param, body_l) = Environment.lookup id defenv in
-     let more_body_l = List.map (fun x -> match x with Constructor (n, t) -> (n, t) | Field (n, t) -> (n, t) (* nonsense *)) body_l in
+     let more_body_l = List.map (fun x -> match x with Constructor (n, t) -> (n, t) | Field (n, t, _) -> (n, t) (* nonsense *)) body_l in
      let param_ty_assoc_list = List.combine param tys in
      let ty' = replace param_ty_assoc_list (List.assoc name more_body_l) in
      (match v with
@@ -101,7 +101,7 @@ and string_of_record ty defenv l =
   let rec inner_loop body_l =
     match body_l with
       [] -> "}"
-    | Field (name, ty') :: rest ->
+    | Field (name, ty', _) :: rest ->
        "; " ^ name ^ " = " ^ (string_of_exval (replace param_ty_assoc_list ty') defenv (List.assoc name recordval_assoc_list)) ^ (inner_loop rest)
     | _ -> err ("For debug: at string_of_record")
   in
