@@ -1,5 +1,5 @@
 
-** Conflict (shift/reduce) in state 321.
+** Conflict (shift/reduce) in state 338.
 ** Token involved: BAR
 ** This state is reached from toplevel after reading:
 
@@ -14,7 +14,7 @@ MatchExpr
 MATCH Expr WITH option(BAR) PatternMatchExpr 
                             (?)
 
-** In state 321, looking ahead at BAR, shifting is permitted
+** In state 338, looking ahead at BAR, shifting is permitted
 ** because of the following sub-derivation:
 
 Pattern list(MorePattern) RARROW Expr list(MorePatternMatchExpr) 
@@ -25,7 +25,7 @@ Pattern list(MorePattern) RARROW Expr list(MorePatternMatchExpr)
                                                                                                                         MorePatternMatchExpr list(MorePatternMatchExpr) 
                                                                                                                         . BAR Pattern list(MorePattern) RARROW Expr 
 
-** In state 321, looking ahead at BAR, reducing production
+** In state 338, looking ahead at BAR, reducing production
 ** list(MorePatternMatchExpr) -> 
 ** is permitted because of the following sub-derivation:
 
@@ -36,8 +36,9 @@ Pattern list(MorePattern) RARROW Expr list(MorePatternMatchExpr) // lookahead to
                                                                                                    MorePatternMatchExpr list(MorePatternMatchExpr) // lookahead token is inherited
                                                                                                                         . 
 
-** Conflict (shift/reduce) in state 317.
-** Token involved: COMMA
+** Conflict (shift/reduce) in state 334.
+** Tokens involved: DOT COMMA
+** The following explanations concentrate on token DOT.
 ** This state is reached from toplevel after reading:
 
 MATCH Expr WITH option(BAR) Pattern list(MorePattern) RARROW Expr BAR Pattern list(MorePattern) RARROW Expr 
@@ -49,19 +50,19 @@ toplevel
 Expr SEMISEMI 
 (?)
 
-** In state 317, looking ahead at COMMA, reducing production
+** In state 334, looking ahead at DOT, reducing production
 ** MorePatternMatchExpr -> BAR Pattern list(MorePattern) RARROW Expr 
 ** is permitted because of the following sub-derivation:
 
-TupleHeadExpr 
-Expr TupleTailExpr // lookahead token appears because TupleTailExpr can begin with COMMA
+RcdAssignExpr 
+Expr DOT ID LARROW RcdAssignExpr // lookahead token appears
 MatchExpr // lookahead token is inherited
 MATCH Expr WITH option(BAR) PatternMatchExpr // lookahead token is inherited
                             Pattern list(MorePattern) RARROW Expr list(MorePatternMatchExpr) // lookahead token is inherited
                                                                   MorePatternMatchExpr list(MorePatternMatchExpr) // lookahead token is inherited because list(MorePatternMatchExpr) can vanish
                                                                   BAR Pattern list(MorePattern) RARROW Expr . 
 
-** In state 317, looking ahead at COMMA, shifting is permitted
+** In state 334, looking ahead at DOT, shifting is permitted
 ** because of the following sub-derivation:
 
 MatchExpr 
@@ -69,13 +70,12 @@ MATCH Expr WITH option(BAR) PatternMatchExpr
                             Pattern list(MorePattern) RARROW Expr list(MorePatternMatchExpr) 
                                                                   MorePatternMatchExpr list(MorePatternMatchExpr) 
                                                                   BAR Pattern list(MorePattern) RARROW Expr 
-                                                                                                       TupleHeadExpr 
-                                                                                                       Expr TupleTailExpr 
-                                                                                                            . COMMA Expr 
+                                                                                                       RcdAssignExpr 
+                                                                                                       Expr . DOT ID LARROW RcdAssignExpr 
 
-** Conflict (shift/reduce) in state 312.
-** Tokens involved: COMMA BAR
-** The following explanations concentrate on token COMMA.
+** Conflict (shift/reduce) in state 329.
+** Tokens involved: DOT COMMA BAR
+** The following explanations concentrate on token DOT.
 ** This state is reached from toplevel after reading:
 
 MATCH Expr WITH option(BAR) Pattern list(MorePattern) RARROW Expr 
@@ -87,67 +87,31 @@ toplevel
 Expr SEMISEMI 
 (?)
 
-** In state 312, looking ahead at COMMA, shifting is permitted
+** In state 329, looking ahead at DOT, shifting is permitted
 ** because of the following sub-derivation:
 
 MatchExpr 
 MATCH Expr WITH option(BAR) PatternMatchExpr 
                             Pattern list(MorePattern) RARROW Expr list(MorePatternMatchExpr) 
-                                                             TupleHeadExpr 
-                                                             Expr TupleTailExpr 
-                                                                  . COMMA Expr 
+                                                             RcdAssignExpr 
+                                                             Expr . DOT ID LARROW RcdAssignExpr 
 
-** In state 312, looking ahead at COMMA, reducing production
+** In state 329, looking ahead at DOT, reducing production
 ** list(MorePatternMatchExpr) -> 
 ** is permitted because of the following sub-derivation:
 
-TupleHeadExpr 
-Expr TupleTailExpr // lookahead token appears because TupleTailExpr can begin with COMMA
+RcdAssignExpr 
+Expr DOT ID LARROW RcdAssignExpr // lookahead token appears
 MatchExpr // lookahead token is inherited
 MATCH Expr WITH option(BAR) PatternMatchExpr // lookahead token is inherited
                             Pattern list(MorePattern) RARROW Expr list(MorePatternMatchExpr) // lookahead token is inherited
                                                                   . 
 
-** Conflict (reduce/reduce) in state 283.
-** Tokens involved: SEMI RPAREN RCLYBRA RBOXBRA RARROW COMMA COLON BAR
-** The following explanations concentrate on token RARROW.
-** This state is reached from toplevel after reading:
-
-MATCH Expr WITH option(BAR) Pattern COMMA Pattern TupleTailPattern 
-
-** The derivations that appear below have the following common factor:
-** (The question mark symbol (?) represents the spot where the derivations begin to differ.)
-
-toplevel 
-Expr SEMISEMI 
-MatchExpr 
-MATCH Expr WITH option(BAR) PatternMatchExpr 
-                            Pattern list(MorePattern) RARROW Expr list(MorePatternMatchExpr) // lookahead token appears because list(MorePattern) can vanish
-                            TuplePattern // lookahead token is inherited
-                            TupleHeadPattern // lookahead token is inherited
-                            Pattern TupleTailPattern // lookahead token is inherited
-                                    (?)
-
-** In state 283, looking ahead at RARROW, reducing production
-** TupleHeadPattern -> Pattern TupleTailPattern 
-** is permitted because of the following sub-derivation:
-
-COMMA Pattern // lookahead token is inherited
-      TuplePattern // lookahead token is inherited
-      TupleHeadPattern // lookahead token is inherited
-      Pattern TupleTailPattern . 
-
-** In state 283, looking ahead at RARROW, reducing production
-** TupleTailPattern -> COMMA Pattern TupleTailPattern 
-** is permitted because of the following sub-derivation:
-
-COMMA Pattern TupleTailPattern . 
-
-** Conflict (shift/reduce) in state 282.
+** Conflict (shift/reduce) in state 299.
 ** Token involved: COMMA
 ** This state is reached from toplevel after reading:
 
-MATCH Expr WITH option(BAR) Pattern COMMA Pattern 
+MATCH Expr WITH option(BAR) Pattern COMMA ConsPattern 
 
 ** The derivations that appear below have the following common factor:
 ** (The question mark symbol (?) represents the spot where the derivations begin to differ.)
@@ -161,25 +125,26 @@ MATCH Expr WITH option(BAR) PatternMatchExpr
                             TupleHeadPattern 
                             (?)
 
-** In state 282, looking ahead at COMMA, shifting is permitted
+** In state 299, looking ahead at COMMA, shifting is permitted
 ** because of the following sub-derivation:
 
 Pattern TupleTailPattern 
-        COMMA Pattern TupleTailPattern 
-                      . COMMA Pattern 
+        COMMA ConsPattern TupleTailPattern 
+                          . COMMA ConsPattern 
 
-** In state 282, looking ahead at COMMA, reducing production
-** TupleTailPattern -> COMMA Pattern 
+** In state 299, looking ahead at COMMA, reducing production
+** TupleTailPattern -> COMMA ConsPattern 
 ** is permitted because of the following sub-derivation:
 
 Pattern TupleTailPattern // lookahead token appears because TupleTailPattern can begin with COMMA
 TuplePattern // lookahead token is inherited
 TupleHeadPattern // lookahead token is inherited
 Pattern TupleTailPattern // lookahead token is inherited
-        COMMA Pattern . 
+        COMMA ConsPattern . 
 
-** Conflict (shift/reduce) in state 248.
-** Token involved: COMMA
+** Conflict (shift/reduce) in state 264.
+** Tokens involved: DOT COMMA
+** The following explanations concentrate on token DOT.
 ** This state is reached from toplevel after reading:
 
 LET ID LetFunExpr IN Expr 
@@ -191,28 +156,28 @@ toplevel
 Expr SEMISEMI 
 (?)
 
-** In state 248, looking ahead at COMMA, reducing production
+** In state 264, looking ahead at DOT, reducing production
 ** LetAndExpr -> ID LetFunExpr IN Expr 
 ** is permitted because of the following sub-derivation:
 
-TupleHeadExpr 
-Expr TupleTailExpr // lookahead token appears because TupleTailExpr can begin with COMMA
+RcdAssignExpr 
+Expr DOT ID LARROW RcdAssignExpr // lookahead token appears
 LetExpr // lookahead token is inherited
 LET LetAndExpr // lookahead token is inherited
     ID LetFunExpr IN Expr . 
 
-** In state 248, looking ahead at COMMA, shifting is permitted
+** In state 264, looking ahead at DOT, shifting is permitted
 ** because of the following sub-derivation:
 
 LetExpr 
 LET LetAndExpr 
     ID LetFunExpr IN Expr 
-                     TupleHeadExpr 
-                     Expr TupleTailExpr 
-                          . COMMA Expr 
+                     RcdAssignExpr 
+                     Expr . DOT ID LARROW RcdAssignExpr 
 
-** Conflict (shift/reduce) in state 246.
-** Token involved: COMMA
+** Conflict (shift/reduce) in state 262.
+** Tokens involved: DOT COMMA
+** The following explanations concentrate on token DOT.
 ** This state is reached from toplevel after reading:
 
 LET IDt EQ Expr IN Expr 
@@ -224,28 +189,28 @@ toplevel
 Expr SEMISEMI 
 (?)
 
-** In state 246, looking ahead at COMMA, reducing production
+** In state 262, looking ahead at DOT, reducing production
 ** LetAndExpr -> IDt EQ Expr IN Expr 
 ** is permitted because of the following sub-derivation:
 
-TupleHeadExpr 
-Expr TupleTailExpr // lookahead token appears because TupleTailExpr can begin with COMMA
+RcdAssignExpr 
+Expr DOT ID LARROW RcdAssignExpr // lookahead token appears
 LetExpr // lookahead token is inherited
 LET LetAndExpr // lookahead token is inherited
     IDt EQ Expr IN Expr . 
 
-** In state 246, looking ahead at COMMA, shifting is permitted
+** In state 262, looking ahead at DOT, shifting is permitted
 ** because of the following sub-derivation:
 
 LetExpr 
 LET LetAndExpr 
     IDt EQ Expr IN Expr 
-                   TupleHeadExpr 
-                   Expr TupleTailExpr 
-                        . COMMA Expr 
+                   RcdAssignExpr 
+                   Expr . DOT ID LARROW RcdAssignExpr 
 
-** Conflict (shift/reduce) in state 234.
-** Token involved: COMMA
+** Conflict (shift/reduce) in state 250.
+** Tokens involved: DOT COMMA
+** The following explanations concentrate on token DOT.
 ** This state is reached from toplevel after reading:
 
 LET REC ID LetFunExpr IN Expr 
@@ -257,28 +222,28 @@ toplevel
 Expr SEMISEMI 
 (?)
 
-** In state 234, looking ahead at COMMA, reducing production
+** In state 250, looking ahead at DOT, reducing production
 ** LetRecAndExpr -> ID LetFunExpr IN Expr 
 ** is permitted because of the following sub-derivation:
 
-TupleHeadExpr 
-Expr TupleTailExpr // lookahead token appears because TupleTailExpr can begin with COMMA
+RcdAssignExpr 
+Expr DOT ID LARROW RcdAssignExpr // lookahead token appears
 LetRecExpr // lookahead token is inherited
 LET REC LetRecAndExpr // lookahead token is inherited
         ID LetFunExpr IN Expr . 
 
-** In state 234, looking ahead at COMMA, shifting is permitted
+** In state 250, looking ahead at DOT, shifting is permitted
 ** because of the following sub-derivation:
 
 LetRecExpr 
 LET REC LetRecAndExpr 
         ID LetFunExpr IN Expr 
-                         TupleHeadExpr 
-                         Expr TupleTailExpr 
-                              . COMMA Expr 
+                         RcdAssignExpr 
+                         Expr . DOT ID LARROW RcdAssignExpr 
 
-** Conflict (shift/reduce) in state 232.
-** Token involved: COMMA
+** Conflict (shift/reduce) in state 248.
+** Tokens involved: DOT COMMA
+** The following explanations concentrate on token DOT.
 ** This state is reached from toplevel after reading:
 
 LET REC IDt EQ FunExpr IN Expr 
@@ -290,28 +255,28 @@ toplevel
 Expr SEMISEMI 
 (?)
 
-** In state 232, looking ahead at COMMA, reducing production
+** In state 248, looking ahead at DOT, reducing production
 ** LetRecAndExpr -> IDt EQ FunExpr IN Expr 
 ** is permitted because of the following sub-derivation:
 
-TupleHeadExpr 
-Expr TupleTailExpr // lookahead token appears because TupleTailExpr can begin with COMMA
+RcdAssignExpr 
+Expr DOT ID LARROW RcdAssignExpr // lookahead token appears
 LetRecExpr // lookahead token is inherited
 LET REC LetRecAndExpr // lookahead token is inherited
         IDt EQ FunExpr IN Expr . 
 
-** In state 232, looking ahead at COMMA, shifting is permitted
+** In state 248, looking ahead at DOT, shifting is permitted
 ** because of the following sub-derivation:
 
 LetRecExpr 
 LET REC LetRecAndExpr 
         IDt EQ FunExpr IN Expr 
-                          TupleHeadExpr 
-                          Expr TupleTailExpr 
-                               . COMMA Expr 
+                          RcdAssignExpr 
+                          Expr . DOT ID LARROW RcdAssignExpr 
 
-** Conflict (shift/reduce) in state 193.
-** Token involved: COMMA
+** Conflict (shift/reduce) in state 209.
+** Tokens involved: DOT COMMA
+** The following explanations concentrate on token DOT.
 ** This state is reached from toplevel after reading:
 
 IF Expr THEN Expr ELSE Expr 
@@ -323,26 +288,26 @@ toplevel
 Expr SEMISEMI 
 (?)
 
-** In state 193, looking ahead at COMMA, reducing production
+** In state 209, looking ahead at DOT, reducing production
 ** IfExpr -> IF Expr THEN Expr ELSE Expr 
 ** is permitted because of the following sub-derivation:
 
-TupleHeadExpr 
-Expr TupleTailExpr // lookahead token appears because TupleTailExpr can begin with COMMA
+RcdAssignExpr 
+Expr DOT ID LARROW RcdAssignExpr // lookahead token appears
 IfExpr // lookahead token is inherited
 IF Expr THEN Expr ELSE Expr . 
 
-** In state 193, looking ahead at COMMA, shifting is permitted
+** In state 209, looking ahead at DOT, shifting is permitted
 ** because of the following sub-derivation:
 
 IfExpr 
 IF Expr THEN Expr ELSE Expr 
-                       TupleHeadExpr 
-                       Expr TupleTailExpr 
-                            . COMMA Expr 
+                       RcdAssignExpr 
+                       Expr . DOT ID LARROW RcdAssignExpr 
 
-** Conflict (shift/reduce) in state 188.
-** Token involved: COMMA
+** Conflict (shift/reduce) in state 204.
+** Tokens involved: DOT COMMA
+** The following explanations concentrate on token DOT.
 ** This state is reached from toplevel after reading:
 
 FUN nonempty_list(IDt) RARROW Expr 
@@ -354,25 +319,24 @@ toplevel
 Expr SEMISEMI 
 (?)
 
-** In state 188, looking ahead at COMMA, reducing production
+** In state 204, looking ahead at DOT, reducing production
 ** FunExpr -> FUN nonempty_list(IDt) RARROW Expr 
 ** is permitted because of the following sub-derivation:
 
-TupleHeadExpr 
-Expr TupleTailExpr // lookahead token appears because TupleTailExpr can begin with COMMA
+RcdAssignExpr 
+Expr DOT ID LARROW RcdAssignExpr // lookahead token appears
 FunExpr // lookahead token is inherited
 FUN nonempty_list(IDt) RARROW Expr . 
 
-** In state 188, looking ahead at COMMA, shifting is permitted
+** In state 204, looking ahead at DOT, shifting is permitted
 ** because of the following sub-derivation:
 
 FunExpr 
 FUN nonempty_list(IDt) RARROW Expr 
-                              TupleHeadExpr 
-                              Expr TupleTailExpr 
-                                   . COMMA Expr 
+                              RcdAssignExpr 
+                              Expr . DOT ID LARROW RcdAssignExpr 
 
-** Conflict (shift/reduce) in state 184.
+** Conflict (shift/reduce) in state 199.
 ** Token involved: AND
 ** This state is reached from toplevel after reading:
 
@@ -387,7 +351,7 @@ OrExpr
 AndExpr 
 (?)
 
-** In state 184, looking ahead at AND, shifting is permitted
+** In state 199, looking ahead at AND, shifting is permitted
 ** because of the following sub-derivation:
 
 CmpExpr 
@@ -399,7 +363,7 @@ PMExpr PLUS LookRightExpr
                                           AndExpr 
                                           AndExpr . AND CmpExpr 
 
-** In state 184, looking ahead at AND, reducing production
+** In state 199, looking ahead at AND, reducing production
 ** OrExpr -> AndExpr 
 ** is permitted because of the following sub-derivation:
 
@@ -414,41 +378,227 @@ PMExpr PLUS LookRightExpr // lookahead token is inherited
                                           OrExpr // lookahead token is inherited
                                           AndExpr . 
 
-** Conflict (reduce/reduce) in state 182.
-** Tokens involved: WITH THEN SEMISEMI SEMI RPAREN RCLYBRA RBOXBRA PLUS OR MULT MT MINUS METAAND LT LET IN HAT EQ ELSE CONS COMMA COLON BAR AND
-** The following explanations concentrate on token SEMISEMI.
+** Conflict (reduce/reduce) in state 198.
+** Tokens involved: DOT COMMA
+** The following explanations concentrate on token DOT.
 ** This state is reached from toplevel after reading:
 
-Expr COMMA Expr TupleTailExpr 
+Expr COMMA DFunExpr 
 
 ** The derivations that appear below have the following common factor:
 ** (The question mark symbol (?) represents the spot where the derivations begin to differ.)
 
 toplevel 
-Expr SEMISEMI // lookahead token appears
+Expr SEMISEMI 
+(?)
+
+** In state 198, looking ahead at DOT, reducing production
+** Expr -> DFunExpr 
+** is permitted because of the following sub-derivation:
+
+TupleHeadExpr 
+Expr TupleTailExpr 
+     COMMA NotTupleExpr 
+           RcdAssignExpr 
+           Expr DOT ID LARROW RcdAssignExpr // lookahead token appears
+           DFunExpr . 
+
+** In state 198, looking ahead at DOT, reducing production
+** NotTupleExpr -> DFunExpr 
+** is permitted because of the following sub-derivation:
+
+RcdAssignExpr 
+Expr DOT ID LARROW RcdAssignExpr // lookahead token appears
 TupleHeadExpr // lookahead token is inherited
 Expr TupleTailExpr // lookahead token is inherited
-     (?)
+     COMMA NotTupleExpr // lookahead token is inherited
+           DFunExpr . 
 
-** In state 182, looking ahead at SEMISEMI, reducing production
-** TupleHeadExpr -> Expr TupleTailExpr 
+** Conflict (reduce/reduce) in state 197.
+** Tokens involved: DOT COMMA
+** The following explanations concentrate on token DOT.
+** This state is reached from toplevel after reading:
+
+Expr COMMA FunExpr 
+
+** The derivations that appear below have the following common factor:
+** (The question mark symbol (?) represents the spot where the derivations begin to differ.)
+
+toplevel 
+Expr SEMISEMI 
+(?)
+
+** In state 197, looking ahead at DOT, reducing production
+** Expr -> FunExpr 
 ** is permitted because of the following sub-derivation:
 
-COMMA Expr // lookahead token is inherited
-      TupleHeadExpr // lookahead token is inherited
-      Expr TupleTailExpr . 
+TupleHeadExpr 
+Expr TupleTailExpr 
+     COMMA NotTupleExpr 
+           RcdAssignExpr 
+           Expr DOT ID LARROW RcdAssignExpr // lookahead token appears
+           FunExpr . 
 
-** In state 182, looking ahead at SEMISEMI, reducing production
-** TupleTailExpr -> COMMA Expr TupleTailExpr 
+** In state 197, looking ahead at DOT, reducing production
+** NotTupleExpr -> FunExpr 
 ** is permitted because of the following sub-derivation:
 
-COMMA Expr TupleTailExpr . 
+RcdAssignExpr 
+Expr DOT ID LARROW RcdAssignExpr // lookahead token appears
+TupleHeadExpr // lookahead token is inherited
+Expr TupleTailExpr // lookahead token is inherited
+     COMMA NotTupleExpr // lookahead token is inherited
+           FunExpr . 
 
-** Conflict (shift/reduce) in state 181.
+** Conflict (reduce/reduce) in state 196.
+** Tokens involved: DOT COMMA
+** The following explanations concentrate on token DOT.
+** This state is reached from toplevel after reading:
+
+Expr COMMA IfExpr 
+
+** The derivations that appear below have the following common factor:
+** (The question mark symbol (?) represents the spot where the derivations begin to differ.)
+
+toplevel 
+Expr SEMISEMI 
+(?)
+
+** In state 196, looking ahead at DOT, reducing production
+** Expr -> IfExpr 
+** is permitted because of the following sub-derivation:
+
+TupleHeadExpr 
+Expr TupleTailExpr 
+     COMMA NotTupleExpr 
+           RcdAssignExpr 
+           Expr DOT ID LARROW RcdAssignExpr // lookahead token appears
+           IfExpr . 
+
+** In state 196, looking ahead at DOT, reducing production
+** NotTupleExpr -> IfExpr 
+** is permitted because of the following sub-derivation:
+
+RcdAssignExpr 
+Expr DOT ID LARROW RcdAssignExpr // lookahead token appears
+TupleHeadExpr // lookahead token is inherited
+Expr TupleTailExpr // lookahead token is inherited
+     COMMA NotTupleExpr // lookahead token is inherited
+           IfExpr . 
+
+** Conflict (reduce/reduce) in state 195.
+** Tokens involved: DOT COMMA
+** The following explanations concentrate on token DOT.
+** This state is reached from toplevel after reading:
+
+Expr COMMA LetExpr 
+
+** The derivations that appear below have the following common factor:
+** (The question mark symbol (?) represents the spot where the derivations begin to differ.)
+
+toplevel 
+Expr SEMISEMI 
+(?)
+
+** In state 195, looking ahead at DOT, reducing production
+** Expr -> LetExpr 
+** is permitted because of the following sub-derivation:
+
+TupleHeadExpr 
+Expr TupleTailExpr 
+     COMMA NotTupleExpr 
+           RcdAssignExpr 
+           Expr DOT ID LARROW RcdAssignExpr // lookahead token appears
+           LetExpr . 
+
+** In state 195, looking ahead at DOT, reducing production
+** NotTupleExpr -> LetExpr 
+** is permitted because of the following sub-derivation:
+
+RcdAssignExpr 
+Expr DOT ID LARROW RcdAssignExpr // lookahead token appears
+TupleHeadExpr // lookahead token is inherited
+Expr TupleTailExpr // lookahead token is inherited
+     COMMA NotTupleExpr // lookahead token is inherited
+           LetExpr . 
+
+** Conflict (reduce/reduce) in state 194.
+** Tokens involved: DOT COMMA
+** The following explanations concentrate on token DOT.
+** This state is reached from toplevel after reading:
+
+Expr COMMA LetRecExpr 
+
+** The derivations that appear below have the following common factor:
+** (The question mark symbol (?) represents the spot where the derivations begin to differ.)
+
+toplevel 
+Expr SEMISEMI 
+(?)
+
+** In state 194, looking ahead at DOT, reducing production
+** Expr -> LetRecExpr 
+** is permitted because of the following sub-derivation:
+
+TupleHeadExpr 
+Expr TupleTailExpr 
+     COMMA NotTupleExpr 
+           RcdAssignExpr 
+           Expr DOT ID LARROW RcdAssignExpr // lookahead token appears
+           LetRecExpr . 
+
+** In state 194, looking ahead at DOT, reducing production
+** NotTupleExpr -> LetRecExpr 
+** is permitted because of the following sub-derivation:
+
+RcdAssignExpr 
+Expr DOT ID LARROW RcdAssignExpr // lookahead token appears
+TupleHeadExpr // lookahead token is inherited
+Expr TupleTailExpr // lookahead token is inherited
+     COMMA NotTupleExpr // lookahead token is inherited
+           LetRecExpr . 
+
+** Conflict (reduce/reduce) in state 193.
+** Tokens involved: DOT COMMA
+** The following explanations concentrate on token DOT.
+** This state is reached from toplevel after reading:
+
+Expr COMMA MatchExpr 
+
+** The derivations that appear below have the following common factor:
+** (The question mark symbol (?) represents the spot where the derivations begin to differ.)
+
+toplevel 
+Expr SEMISEMI 
+(?)
+
+** In state 193, looking ahead at DOT, reducing production
+** Expr -> MatchExpr 
+** is permitted because of the following sub-derivation:
+
+TupleHeadExpr 
+Expr TupleTailExpr 
+     COMMA NotTupleExpr 
+           RcdAssignExpr 
+           Expr DOT ID LARROW RcdAssignExpr // lookahead token appears
+           MatchExpr . 
+
+** In state 193, looking ahead at DOT, reducing production
+** NotTupleExpr -> MatchExpr 
+** is permitted because of the following sub-derivation:
+
+RcdAssignExpr 
+Expr DOT ID LARROW RcdAssignExpr // lookahead token appears
+TupleHeadExpr // lookahead token is inherited
+Expr TupleTailExpr // lookahead token is inherited
+     COMMA NotTupleExpr // lookahead token is inherited
+           MatchExpr . 
+
+** Conflict (shift/reduce) in state 191.
 ** Token involved: COMMA
 ** This state is reached from toplevel after reading:
 
-Expr COMMA Expr 
+Expr COMMA NotTupleExpr 
 
 ** The derivations that appear below have the following common factor:
 ** (The question mark symbol (?) represents the spot where the derivations begin to differ.)
@@ -458,24 +608,128 @@ Expr SEMISEMI
 TupleHeadExpr 
 (?)
 
-** In state 181, looking ahead at COMMA, shifting is permitted
+** In state 191, looking ahead at COMMA, shifting is permitted
 ** because of the following sub-derivation:
 
 Expr TupleTailExpr 
-     COMMA Expr TupleTailExpr 
-                . COMMA Expr 
+     COMMA NotTupleExpr TupleTailExpr 
+                        . COMMA NotTupleExpr 
 
-** In state 181, looking ahead at COMMA, reducing production
-** TupleTailExpr -> COMMA Expr 
+** In state 191, looking ahead at COMMA, reducing production
+** TupleTailExpr -> COMMA NotTupleExpr 
 ** is permitted because of the following sub-derivation:
 
 Expr TupleTailExpr // lookahead token appears because TupleTailExpr can begin with COMMA
 TupleHeadExpr // lookahead token is inherited
 Expr TupleTailExpr // lookahead token is inherited
-     COMMA Expr . 
+     COMMA NotTupleExpr . 
 
-** Conflict (shift/reduce) in state 179.
-** Token involved: COMMA
+** Conflict (reduce/reduce) in state 190.
+** Tokens involved: OR DOT COMMA
+** The following explanations concentrate on token DOT.
+** This state is reached from toplevel after reading:
+
+Expr COMMA OrExpr 
+
+** The derivations that appear below have the following common factor:
+** (The question mark symbol (?) represents the spot where the derivations begin to differ.)
+
+toplevel 
+Expr SEMISEMI 
+(?)
+
+** In state 190, looking ahead at DOT, reducing production
+** Expr -> OrExpr 
+** is permitted because of the following sub-derivation:
+
+TupleHeadExpr 
+Expr TupleTailExpr 
+     COMMA NotTupleExpr 
+           RcdAssignExpr 
+           Expr DOT ID LARROW RcdAssignExpr // lookahead token appears
+           OrExpr . 
+
+** In state 190, looking ahead at DOT, reducing production
+** NotTupleExpr -> OrExpr 
+** is permitted because of the following sub-derivation:
+
+RcdAssignExpr 
+Expr DOT ID LARROW RcdAssignExpr // lookahead token appears
+TupleHeadExpr // lookahead token is inherited
+Expr TupleTailExpr // lookahead token is inherited
+     COMMA NotTupleExpr // lookahead token is inherited
+           OrExpr . 
+
+** Conflict (reduce/reduce) in state 189.
+** Tokens involved: DOT COMMA
+** The following explanations concentrate on token DOT.
+** This state is reached from toplevel after reading:
+
+Expr COMMA RcdAssignExpr 
+
+** The derivations that appear below have the following common factor:
+** (The question mark symbol (?) represents the spot where the derivations begin to differ.)
+
+toplevel 
+Expr SEMISEMI 
+(?)
+
+** In state 189, looking ahead at DOT, reducing production
+** Expr -> RcdAssignExpr 
+** is permitted because of the following sub-derivation:
+
+TupleHeadExpr 
+Expr TupleTailExpr 
+     COMMA NotTupleExpr 
+           RcdAssignExpr 
+           Expr DOT ID LARROW RcdAssignExpr // lookahead token appears
+           RcdAssignExpr . 
+
+** In state 189, looking ahead at DOT, reducing production
+** NotTupleExpr -> RcdAssignExpr 
+** is permitted because of the following sub-derivation:
+
+RcdAssignExpr 
+Expr DOT ID LARROW RcdAssignExpr // lookahead token appears
+TupleHeadExpr // lookahead token is inherited
+Expr TupleTailExpr // lookahead token is inherited
+     COMMA NotTupleExpr // lookahead token is inherited
+           RcdAssignExpr . 
+
+** Conflict (reduce/reduce) in state 186.
+** Tokens involved: DOT COMMA
+** The following explanations concentrate on token DOT.
+** This state is reached from toplevel after reading:
+
+Expr DOT ID LARROW RcdAssignExpr 
+
+** The derivations that appear below have the following common factor:
+** (The question mark symbol (?) represents the spot where the derivations begin to differ.)
+
+toplevel 
+Expr SEMISEMI 
+RcdAssignExpr 
+(?)
+
+** In state 186, looking ahead at DOT, reducing production
+** Expr -> RcdAssignExpr 
+** is permitted because of the following sub-derivation:
+
+Expr DOT ID LARROW RcdAssignExpr 
+                   Expr DOT ID LARROW RcdAssignExpr // lookahead token appears
+                   RcdAssignExpr . 
+
+** In state 186, looking ahead at DOT, reducing production
+** RcdAssignExpr -> Expr DOT ID LARROW RcdAssignExpr 
+** is permitted because of the following sub-derivation:
+
+Expr DOT ID LARROW RcdAssignExpr // lookahead token appears
+RcdAssignExpr // lookahead token is inherited
+Expr DOT ID LARROW RcdAssignExpr . 
+
+** Conflict (shift/reduce) in state 182.
+** Tokens involved: DOT COMMA
+** The following explanations concentrate on token DOT.
 ** This state is reached from toplevel after reading:
 
 DFUN nonempty_list(IDt) RARROW Expr 
@@ -487,25 +741,24 @@ toplevel
 Expr SEMISEMI 
 (?)
 
-** In state 179, looking ahead at COMMA, reducing production
+** In state 182, looking ahead at DOT, reducing production
 ** DFunExpr -> DFUN nonempty_list(IDt) RARROW Expr 
 ** is permitted because of the following sub-derivation:
 
-TupleHeadExpr 
-Expr TupleTailExpr // lookahead token appears because TupleTailExpr can begin with COMMA
+RcdAssignExpr 
+Expr DOT ID LARROW RcdAssignExpr // lookahead token appears
 DFunExpr // lookahead token is inherited
 DFUN nonempty_list(IDt) RARROW Expr . 
 
-** In state 179, looking ahead at COMMA, shifting is permitted
+** In state 182, looking ahead at DOT, shifting is permitted
 ** because of the following sub-derivation:
 
 DFunExpr 
 DFUN nonempty_list(IDt) RARROW Expr 
-                               TupleHeadExpr 
-                               Expr TupleTailExpr 
-                                    . COMMA Expr 
+                               RcdAssignExpr 
+                               Expr . DOT ID LARROW RcdAssignExpr 
 
-** Conflict (shift/reduce) in state 173.
+** Conflict (shift/reduce) in state 176.
 ** Token involved: EQ
 ** This state is reached from toplevel after reading:
 
@@ -521,7 +774,7 @@ AndExpr
 CmpExpr 
 (?)
 
-** In state 173, looking ahead at EQ, reducing production
+** In state 176, looking ahead at EQ, reducing production
 ** AndExpr -> AndExpr AND CmpExpr 
 ** is permitted because of the following sub-derivation:
 
@@ -536,7 +789,7 @@ PMExpr PLUS LookRightExpr // lookahead token is inherited
                                           AndExpr // lookahead token is inherited
                                           AndExpr AND CmpExpr . 
 
-** In state 173, looking ahead at EQ, shifting is permitted
+** In state 176, looking ahead at EQ, shifting is permitted
 ** because of the following sub-derivation:
 
 PMExpr LT PMExpr 
@@ -548,7 +801,7 @@ PMExpr PLUS LookRightExpr
                                           AndExpr AND CmpExpr 
                                                       CmpExpr . EQ PMExpr 
 
-** Conflict (shift/reduce) in state 170.
+** Conflict (shift/reduce) in state 173.
 ** Token involved: AND
 ** This state is reached from toplevel after reading:
 
@@ -563,7 +816,7 @@ OrExpr
 AndExpr 
 (?)
 
-** In state 170, looking ahead at AND, shifting is permitted
+** In state 173, looking ahead at AND, shifting is permitted
 ** because of the following sub-derivation:
 
 CmpExpr 
@@ -575,7 +828,7 @@ PMExpr PLUS LookRightExpr
                                           OrExpr OR AndExpr 
                                                     AndExpr . AND CmpExpr 
 
-** In state 170, looking ahead at AND, reducing production
+** In state 173, looking ahead at AND, reducing production
 ** OrExpr -> OrExpr OR AndExpr 
 ** is permitted because of the following sub-derivation:
 
@@ -590,7 +843,7 @@ PMExpr PLUS LookRightExpr // lookahead token is inherited
                                           OrExpr // lookahead token is inherited
                                           OrExpr OR AndExpr . 
 
-** Conflict (shift/reduce) in state 168.
+** Conflict (shift/reduce) in state 171.
 ** Tokens involved: PLUS MINUS
 ** The following explanations concentrate on token PLUS.
 ** This state is reached from toplevel after reading:
@@ -608,7 +861,7 @@ CmpExpr
 PMExpr LT PMExpr 
 (?)
 
-** In state 168, looking ahead at PLUS, reducing production
+** In state 171, looking ahead at PLUS, reducing production
 ** CmpExpr -> CmpExpr EQ PMExpr 
 ** is permitted because of the following sub-derivation:
 
@@ -621,7 +874,7 @@ PMExpr PLUS LookRightExpr // lookahead token is inherited
                                           CmpExpr // lookahead token is inherited
                                           CmpExpr EQ PMExpr . 
 
-** In state 168, looking ahead at PLUS, shifting is permitted
+** In state 171, looking ahead at PLUS, shifting is permitted
 ** because of the following sub-derivation:
 
 PMExpr PLUS LookRightExpr 
@@ -633,7 +886,7 @@ PMExpr PLUS LookRightExpr
                                           CmpExpr EQ PMExpr 
                                                      PMExpr . PLUS MExpr 
 
-** Conflict (shift/reduce) in state 166.
+** Conflict (shift/reduce) in state 169.
 ** Token involved: EQ
 ** This state is reached from toplevel after reading:
 
@@ -649,7 +902,7 @@ AndExpr
 CmpExpr 
 (?)
 
-** In state 166, looking ahead at EQ, reducing production
+** In state 169, looking ahead at EQ, reducing production
 ** AndExpr -> CmpExpr 
 ** is permitted because of the following sub-derivation:
 
@@ -664,7 +917,7 @@ PMExpr PLUS LookRightExpr // lookahead token is inherited
                                           AndExpr // lookahead token is inherited
                                           CmpExpr . 
 
-** In state 166, looking ahead at EQ, shifting is permitted
+** In state 169, looking ahead at EQ, shifting is permitted
 ** because of the following sub-derivation:
 
 PMExpr LT PMExpr 
@@ -676,7 +929,7 @@ PMExpr PLUS LookRightExpr
                                           CmpExpr 
                                           CmpExpr . EQ PMExpr 
 
-** Conflict (shift/reduce) in state 162.
+** Conflict (shift/reduce) in state 165.
 ** Tokens involved: PLUS MINUS
 ** The following explanations concentrate on token PLUS.
 ** This state is reached from toplevel after reading:
@@ -694,7 +947,7 @@ CmpExpr
 PMExpr LT PMExpr 
 (?)
 
-** In state 162, looking ahead at PLUS, reducing production
+** In state 165, looking ahead at PLUS, reducing production
 ** HExpr -> PMExpr 
 ** is permitted because of the following sub-derivation:
 
@@ -710,7 +963,7 @@ PMExpr PLUS LookRightExpr // lookahead token is inherited
                                                      HExpr // lookahead token is inherited
                                                      PMExpr . 
 
-** In state 162, looking ahead at PLUS, shifting is permitted
+** In state 165, looking ahead at PLUS, shifting is permitted
 ** because of the following sub-derivation:
 
 PMExpr PLUS LookRightExpr 
@@ -725,7 +978,7 @@ PMExpr PLUS LookRightExpr
                                                      PMExpr 
                                                      PMExpr . PLUS MExpr 
 
-** Conflict (shift/reduce) in state 160.
+** Conflict (shift/reduce) in state 163.
 ** Tokens involved: PLUS MINUS
 ** The following explanations concentrate on token PLUS.
 ** This state is reached from toplevel after reading:
@@ -743,7 +996,7 @@ CmpExpr
 PMExpr LT PMExpr 
 (?)
 
-** In state 160, looking ahead at PLUS, reducing production
+** In state 163, looking ahead at PLUS, reducing production
 ** HExpr -> HExpr HAT PMExpr 
 ** is permitted because of the following sub-derivation:
 
@@ -758,7 +1011,7 @@ PMExpr PLUS LookRightExpr // lookahead token is inherited
                                           HExpr // lookahead token is inherited
                                           HExpr HAT PMExpr . 
 
-** In state 160, looking ahead at PLUS, shifting is permitted
+** In state 163, looking ahead at PLUS, shifting is permitted
 ** because of the following sub-derivation:
 
 PMExpr PLUS LookRightExpr 
@@ -772,7 +1025,7 @@ PMExpr PLUS LookRightExpr
                                           HExpr HAT PMExpr 
                                                     PMExpr . PLUS MExpr 
 
-** Conflict (shift/reduce) in state 158.
+** Conflict (shift/reduce) in state 161.
 ** Tokens involved: HAT CONS
 ** The following explanations concentrate on token HAT.
 ** This state is reached from toplevel after reading:
@@ -789,7 +1042,7 @@ AndExpr
 CmpExpr 
 (?)
 
-** In state 158, looking ahead at HAT, reducing production
+** In state 161, looking ahead at HAT, reducing production
 ** ConsExpr -> HExpr 
 ** is permitted because of the following sub-derivation:
 
@@ -806,7 +1059,7 @@ PMExpr PLUS LookRightExpr // lookahead token is inherited
                                           ConsExpr // lookahead token is inherited
                                           HExpr . 
 
-** In state 158, looking ahead at HAT, shifting is permitted
+** In state 161, looking ahead at HAT, shifting is permitted
 ** because of the following sub-derivation:
 
 PMExpr LT PMExpr 
@@ -820,7 +1073,7 @@ PMExpr PLUS LookRightExpr
                                           HExpr CONS ConsExpr 
                                           HExpr . HAT PMExpr 
 
-** Conflict (shift/reduce) in state 155.
+** Conflict (shift/reduce) in state 158.
 ** Token involved: OR
 ** This state is reached from toplevel after reading:
 
@@ -834,7 +1087,7 @@ Expr SEMISEMI
 OrExpr 
 (?)
 
-** In state 155, looking ahead at OR, reducing production
+** In state 158, looking ahead at OR, reducing production
 ** Expr -> OrExpr 
 ** is permitted because of the following sub-derivation:
 
@@ -849,7 +1102,7 @@ PMExpr PLUS LookRightExpr // lookahead token is inherited
             FUN nonempty_list(IDt) RARROW Expr // lookahead token is inherited
                                           OrExpr . 
 
-** In state 155, looking ahead at OR, shifting is permitted
+** In state 158, looking ahead at OR, shifting is permitted
 ** because of the following sub-derivation:
 
 AndExpr 
@@ -861,7 +1114,7 @@ PMExpr PLUS LookRightExpr
                                           OrExpr 
                                           OrExpr . OR AndExpr 
 
-** Conflict (shift/reduce) in state 153.
+** Conflict (shift/reduce) in state 156.
 ** Tokens involved: PLUS MINUS
 ** The following explanations concentrate on token PLUS.
 ** This state is reached from toplevel after reading:
@@ -879,7 +1132,7 @@ CmpExpr
 PMExpr LT PMExpr 
 (?)
 
-** In state 153, looking ahead at PLUS, reducing production
+** In state 156, looking ahead at PLUS, reducing production
 ** CmpExpr -> PMExpr LT PMExpr 
 ** is permitted because of the following sub-derivation:
 
@@ -892,7 +1145,7 @@ PMExpr PLUS LookRightExpr // lookahead token is inherited
                                           CmpExpr // lookahead token is inherited
                                           PMExpr LT PMExpr . 
 
-** In state 153, looking ahead at PLUS, shifting is permitted
+** In state 156, looking ahead at PLUS, shifting is permitted
 ** because of the following sub-derivation:
 
 PMExpr PLUS LookRightExpr 
@@ -904,7 +1157,7 @@ PMExpr PLUS LookRightExpr
                                           PMExpr LT PMExpr 
                                                     PMExpr . PLUS MExpr 
 
-** Conflict (shift/reduce) in state 150.
+** Conflict (shift/reduce) in state 153.
 ** Token involved: MULT
 ** This state is reached from toplevel after reading:
 
@@ -922,7 +1175,7 @@ PMExpr LT PMExpr
 MExpr 
 (?)
 
-** In state 150, looking ahead at MULT, shifting is permitted
+** In state 153, looking ahead at MULT, shifting is permitted
 ** because of the following sub-derivation:
 
 MExpr MULT LookRightExpr 
@@ -935,7 +1188,7 @@ MExpr MULT LookRightExpr
                                          MExpr 
                                          MExpr . MULT EExpr 
 
-** In state 150, looking ahead at MULT, reducing production
+** In state 153, looking ahead at MULT, reducing production
 ** PMExpr -> MExpr 
 ** is permitted because of the following sub-derivation:
 
@@ -951,7 +1204,7 @@ MExpr MULT LookRightExpr // lookahead token is inherited
                                          PMExpr // lookahead token is inherited
                                          MExpr . 
 
-** Conflict (shift/reduce) in state 148.
+** Conflict (shift/reduce) in state 151.
 ** Token involved: MULT
 ** This state is reached from toplevel after reading:
 
@@ -969,7 +1222,7 @@ PMExpr LT PMExpr
 MExpr 
 (?)
 
-** In state 148, looking ahead at MULT, shifting is permitted
+** In state 151, looking ahead at MULT, shifting is permitted
 ** because of the following sub-derivation:
 
 MExpr MULT LookRightExpr 
@@ -982,7 +1235,7 @@ MExpr MULT LookRightExpr
                                          PMExpr MINUS MExpr 
                                                       MExpr . MULT EExpr 
 
-** In state 148, looking ahead at MULT, reducing production
+** In state 151, looking ahead at MULT, reducing production
 ** PMExpr -> PMExpr MINUS MExpr 
 ** is permitted because of the following sub-derivation:
 
@@ -998,7 +1251,7 @@ MExpr MULT LookRightExpr // lookahead token is inherited
                                          PMExpr // lookahead token is inherited
                                          PMExpr MINUS MExpr . 
 
-** Conflict (shift/reduce) in state 146.
+** Conflict (shift/reduce) in state 149.
 ** Tokens involved: PLUS MINUS
 ** The following explanations concentrate on token PLUS.
 ** This state is reached from toplevel after reading:
@@ -1016,7 +1269,7 @@ CmpExpr
 PMExpr LT PMExpr 
 (?)
 
-** In state 146, looking ahead at PLUS, reducing production
+** In state 149, looking ahead at PLUS, reducing production
 ** CmpExpr -> PMExpr MT PMExpr 
 ** is permitted because of the following sub-derivation:
 
@@ -1029,7 +1282,7 @@ PMExpr PLUS LookRightExpr // lookahead token is inherited
                                           CmpExpr // lookahead token is inherited
                                           PMExpr MT PMExpr . 
 
-** In state 146, looking ahead at PLUS, shifting is permitted
+** In state 149, looking ahead at PLUS, shifting is permitted
 ** because of the following sub-derivation:
 
 PMExpr PLUS LookRightExpr 
@@ -1041,7 +1294,7 @@ PMExpr PLUS LookRightExpr
                                           PMExpr MT PMExpr 
                                                     PMExpr . PLUS MExpr 
 
-** Conflict (shift/reduce) in state 127.
+** Conflict (shift/reduce) in state 130.
 ** Token involved: MULT
 ** This state is reached from toplevel after reading:
 
@@ -1059,7 +1312,7 @@ PMExpr LT PMExpr
 MExpr 
 (?)
 
-** In state 127, looking ahead at MULT, shifting is permitted
+** In state 130, looking ahead at MULT, shifting is permitted
 ** because of the following sub-derivation:
 
 MExpr MULT LookRightExpr 
@@ -1072,7 +1325,7 @@ MExpr MULT LookRightExpr
                                          PMExpr PLUS MExpr 
                                                      MExpr . MULT EExpr 
 
-** In state 127, looking ahead at MULT, reducing production
+** In state 130, looking ahead at MULT, reducing production
 ** PMExpr -> PMExpr PLUS MExpr 
 ** is permitted because of the following sub-derivation:
 
@@ -1088,7 +1341,7 @@ MExpr MULT LookRightExpr // lookahead token is inherited
                                          PMExpr // lookahead token is inherited
                                          PMExpr PLUS MExpr . 
 
-** Conflict (shift/reduce) in state 124.
+** Conflict (shift/reduce) in state 127.
 ** Tokens involved: PLUS MT MINUS LT
 ** The following explanations concentrate on token PLUS.
 ** This state is reached from toplevel after reading:
@@ -1106,7 +1359,7 @@ CmpExpr
 PMExpr LT PMExpr 
 (?)
 
-** In state 124, looking ahead at PLUS, reducing production
+** In state 127, looking ahead at PLUS, reducing production
 ** HExpr -> PMExpr 
 ** is permitted because of the following sub-derivation:
 
@@ -1121,7 +1374,7 @@ PMExpr PLUS LookRightExpr // lookahead token is inherited
                                           HExpr // lookahead token is inherited
                                           PMExpr . 
 
-** In state 124, looking ahead at PLUS, shifting is permitted
+** In state 127, looking ahead at PLUS, shifting is permitted
 ** because of the following sub-derivation:
 
 PMExpr PLUS LookRightExpr 
@@ -1133,7 +1386,54 @@ PMExpr PLUS LookRightExpr
                                           PMExpr LT PMExpr 
                                           PMExpr . PLUS MExpr 
 
-** Conflict (shift/reduce) in state 114.
+** Conflict (shift/reduce) in state 119.
+** Token involved: DOT
+** This state is reached from toplevel after reading:
+
+ProjExpr 
+
+** The derivations that appear below have the following common factor:
+** (The question mark symbol (?) represents the spot where the derivations begin to differ.)
+
+toplevel 
+Expr SEMISEMI 
+(?)
+
+** In state 119, looking ahead at DOT, reducing production
+** CnstrExpr -> ProjExpr 
+** is permitted because of the following sub-derivation:
+
+RcdAssignExpr 
+Expr DOT ID LARROW RcdAssignExpr // lookahead token appears
+OrExpr // lookahead token is inherited
+AndExpr // lookahead token is inherited
+CmpExpr // lookahead token is inherited
+ConsExpr // lookahead token is inherited
+HExpr // lookahead token is inherited
+PMExpr // lookahead token is inherited
+MExpr // lookahead token is inherited
+EExpr // lookahead token is inherited
+AppExpr // lookahead token is inherited
+FunInfixExpr // lookahead token is inherited
+CnstrExpr // lookahead token is inherited
+ProjExpr . 
+
+** In state 119, looking ahead at DOT, shifting is permitted
+** because of the following sub-derivation:
+
+OrExpr 
+AndExpr 
+CmpExpr 
+PMExpr LT PMExpr 
+MExpr 
+EExpr 
+AppExpr EXPO EExpr 
+FunInfixExpr 
+CnstrExpr 
+ProjExpr 
+ProjExpr . DOT ID 
+
+** Conflict (shift/reduce) in state 116.
 ** Tokens involved: TRUE STRINGV LPAREN LCLYBRA LBOXBRA INTV ID FALSE CNSTR
 ** The following explanations concentrate on token TRUE.
 ** This state is reached from toplevel after reading:
@@ -1154,7 +1454,7 @@ EExpr
 AppExpr EXPO EExpr 
 (?)
 
-** In state 114, looking ahead at TRUE, shifting is permitted
+** In state 116, looking ahead at TRUE, shifting is permitted
 ** because of the following sub-derivation:
 
 FunInfixExpr 
@@ -1164,7 +1464,7 @@ CNSTR CnstrExpr
       AExpr 
       . TRUE 
 
-** In state 114, looking ahead at TRUE, reducing production
+** In state 116, looking ahead at TRUE, reducing production
 ** CnstrExpr -> CNSTR 
 ** is permitted because of the following sub-derivation:
 
@@ -1173,144 +1473,11 @@ FunInfixExpr // lookahead token is inherited
 CnstrExpr // lookahead token is inherited
 CNSTR . 
 
-** Conflict (reduce/reduce) in state 35.
-** Tokens involved: MULT ID
-** The following explanations concentrate on token MULT.
-** This state is reached from toplevel after reading:
-
-LPAREN Expr COLON AType RARROW FunType 
-
-** The derivations that appear below have the following common factor:
-** (The question mark symbol (?) represents the spot where the derivations begin to differ.)
-
-toplevel 
-Expr SEMISEMI 
-OrExpr 
-AndExpr 
-CmpExpr 
-PMExpr LT PMExpr 
-MExpr 
-EExpr 
-AppExpr EXPO EExpr 
-FunInfixExpr 
-CnstrExpr 
-ProjExpr 
-AExpr 
-LPAREN Expr COLON TupleType RPAREN 
-                  (?)
-
-** In state 35, looking ahead at MULT, reducing production
-** FunType -> AType RARROW FunType 
-** is permitted because of the following sub-derivation:
-
-TupleHeadType 
-TupleType TupleTailType // lookahead token appears because TupleTailType can begin with MULT
-FunType // lookahead token is inherited
-AType RARROW FunType . 
-
-** In state 35, looking ahead at MULT, reducing production
-** TupleType -> FunType 
-** is permitted because of the following sub-derivation:
-
-FunType 
-AType RARROW FunType 
-             AType RARROW FunType 
-             TypeParameters ID 
-             TupleType 
-             TupleHeadType 
-             TupleType TupleTailType // lookahead token appears because TupleTailType can begin with MULT
-             FunType . 
-
-** Conflict (reduce/reduce) in state 28.
-** Tokens involved: TYPE SEMISEMI SEMI RPAREN RCLYBRA MULT METAAND ID EQ COMMA BAR
-** The following explanations concentrate on token RPAREN.
-** This state is reached from toplevel after reading:
-
-LPAREN Expr COLON TupleType MULT TupleType TupleTailType 
-
-** The derivations that appear below have the following common factor:
-** (The question mark symbol (?) represents the spot where the derivations begin to differ.)
-
-toplevel 
-Expr SEMISEMI 
-OrExpr 
-AndExpr 
-CmpExpr 
-PMExpr LT PMExpr 
-MExpr 
-EExpr 
-AppExpr EXPO EExpr 
-FunInfixExpr 
-CnstrExpr 
-ProjExpr 
-AExpr 
-LPAREN Expr COLON TupleType RPAREN // lookahead token appears
-                  TupleHeadType // lookahead token is inherited
-                  TupleType TupleTailType // lookahead token is inherited
-                            (?)
-
-** In state 28, looking ahead at RPAREN, reducing production
-** TupleHeadType -> TupleType TupleTailType 
-** is permitted because of the following sub-derivation:
-
-MULT TupleType // lookahead token is inherited
-     TupleHeadType // lookahead token is inherited
-     TupleType TupleTailType . 
-
-** In state 28, looking ahead at RPAREN, reducing production
-** TupleTailType -> MULT TupleType TupleTailType 
-** is permitted because of the following sub-derivation:
-
-MULT TupleType TupleTailType . 
-
-** Conflict (shift/reduce) in state 27.
-** Tokens involved: MULT ID
-** The following explanations concentrate on token MULT.
-** This state is reached from toplevel after reading:
-
-LPAREN Expr COLON TupleType MULT TupleType 
-
-** The derivations that appear below have the following common factor:
-** (The question mark symbol (?) represents the spot where the derivations begin to differ.)
-
-toplevel 
-Expr SEMISEMI 
-OrExpr 
-AndExpr 
-CmpExpr 
-PMExpr LT PMExpr 
-MExpr 
-EExpr 
-AppExpr EXPO EExpr 
-FunInfixExpr 
-CnstrExpr 
-ProjExpr 
-AExpr 
-LPAREN Expr COLON TupleType RPAREN 
-                  TupleHeadType 
-                  (?)
-
-** In state 27, looking ahead at MULT, shifting is permitted
-** because of the following sub-derivation:
-
-TupleType TupleTailType 
-          MULT TupleType TupleTailType 
-                         . MULT TupleType 
-
-** In state 27, looking ahead at MULT, reducing production
-** TupleTailType -> MULT TupleType 
-** is permitted because of the following sub-derivation:
-
-TupleType TupleTailType // lookahead token appears because TupleTailType can begin with MULT
-TupleHeadType // lookahead token is inherited
-TupleType TupleTailType // lookahead token is inherited
-          MULT TupleType . 
-
-** Conflict (shift/reduce) in state 24.
+** Conflict (shift/reduce) in state 38.
 ** Token involved: RPAREN
 ** This state is reached from toplevel after reading:
 
-LPAREN Expr COLON LPAREN TupleType 
+LPAREN Expr COLON LPAREN FunType 
 
 ** The derivations that appear below have the following common factor:
 ** (The question mark symbol (?) represents the spot where the derivations begin to differ.)
@@ -1328,20 +1495,110 @@ FunInfixExpr
 CnstrExpr 
 ProjExpr 
 AExpr 
-LPAREN Expr COLON TupleType RPAREN 
-                  FunType 
-                  AType RARROW FunType 
+LPAREN Expr COLON FunType RPAREN 
+                  TupleType RARROW FunType 
+                  AType 
                   (?)
 
-** In state 24, looking ahead at RPAREN, shifting is permitted
+** In state 38, looking ahead at RPAREN, shifting is permitted
 ** because of the following sub-derivation:
 
-LPAREN TupleType . RPAREN 
+LPAREN FunType . RPAREN 
 
-** In state 24, looking ahead at RPAREN, reducing production
-** ListedTypeParameters -> TupleType 
+** In state 38, looking ahead at RPAREN, reducing production
+** ListedTypeParameters -> FunType 
 ** is permitted because of the following sub-derivation:
 
 TypeParameters ID 
 LPAREN ListedTypeParameters RPAREN // lookahead token appears
-       TupleType . 
+       FunType . 
+
+** Conflict (shift/reduce) in state 30.
+** Tokens involved: RARROW MULT ID
+** The following explanations concentrate on token RARROW.
+** This state is reached from toplevel after reading:
+
+LPAREN Expr COLON FunType MULT TupleType 
+
+** The derivations that appear below have the following common factor:
+** (The question mark symbol (?) represents the spot where the derivations begin to differ.)
+
+toplevel 
+Expr SEMISEMI 
+OrExpr 
+AndExpr 
+CmpExpr 
+PMExpr LT PMExpr 
+MExpr 
+EExpr 
+AppExpr EXPO EExpr 
+FunInfixExpr 
+CnstrExpr 
+ProjExpr 
+AExpr 
+LPAREN Expr COLON FunType RPAREN 
+                  (?)
+
+** In state 30, looking ahead at RARROW, shifting is permitted
+** because of the following sub-derivation:
+
+TupleType RARROW FunType 
+TupleHeadType 
+FunType TupleTailType 
+        MULT TupleType 
+             TupleHeadType 
+             FunType TupleTailType 
+             TupleType . RARROW FunType 
+
+** In state 30, looking ahead at RARROW, reducing production
+** TupleTailType -> MULT TupleType 
+** is permitted because of the following sub-derivation:
+
+TupleType RARROW FunType // lookahead token appears
+TupleHeadType // lookahead token is inherited
+FunType TupleTailType // lookahead token is inherited
+        MULT TupleType . 
+
+** Conflict (shift/reduce) in state 28.
+** Tokens involved: MULT ID
+** The following explanations concentrate on token MULT.
+** This state is reached from toplevel after reading:
+
+LPAREN Expr COLON TupleType RARROW FunType 
+
+** The derivations that appear below have the following common factor:
+** (The question mark symbol (?) represents the spot where the derivations begin to differ.)
+
+toplevel 
+Expr SEMISEMI 
+OrExpr 
+AndExpr 
+CmpExpr 
+PMExpr LT PMExpr 
+MExpr 
+EExpr 
+AppExpr EXPO EExpr 
+FunInfixExpr 
+CnstrExpr 
+ProjExpr 
+AExpr 
+LPAREN Expr COLON FunType RPAREN 
+                  (?)
+
+** In state 28, looking ahead at MULT, reducing production
+** FunType -> TupleType RARROW FunType 
+** is permitted because of the following sub-derivation:
+
+TupleType RARROW FunType 
+TupleHeadType 
+FunType TupleTailType // lookahead token appears because TupleTailType can begin with MULT
+TupleType RARROW FunType . 
+
+** In state 28, looking ahead at MULT, shifting is permitted
+** because of the following sub-derivation:
+
+TupleType RARROW FunType 
+                 TupleType RARROW FunType 
+                 TupleHeadType 
+                 FunType TupleTailType 
+                         . MULT TupleType 

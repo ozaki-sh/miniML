@@ -21,6 +21,7 @@ let reservedWords = [
   ("then", Parser.THEN);
   ("true", Parser.TRUE);
   ("type", Parser.TYPE);
+  ("unit", Parser.UNIT);
   ("with", Parser.WITH);
 ]
 }
@@ -61,6 +62,7 @@ rule main = parse
 | "{" { Parser.LCLYBRA }
 | "}" { Parser.RCLYBRA }
 | "." { Parser.DOT }
+| "<-" { Parser.LARROW }
 
 | ['a'-'z'] ['a'-'z' 'A'-'Z' '0'-'9' '_' '\'']*
     { let id = Lexing.lexeme lexbuf in

@@ -48,3 +48,6 @@ arg_ty -> replaced_arg_ty
 
 
 this_ty?
+
+
+Assign -> 環境を書き換える

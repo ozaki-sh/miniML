@@ -1,5 +1,7 @@
 open Syntax
 
+
+type loc = int
 (* 値の定義 *)
 
 (* exval は式を評価して得られる値．dnval は変数と紐付けられる値．今回
@@ -15,6 +17,8 @@ type exval =
   | DProcV of id * exp
   | ListV of listval
   | TupleV of tupleval
+  | UnitV
+  | RefV of loc
 and listval = EmpV | ConsV of exval * listval
 and tupleval = EmpTV | ConsTV of exval * tupleval
 and recordval = EmpRV | ConsRV of (name * exval) * recordval
@@ -54,33 +58,33 @@ let replace param_ty_assoc_list ty =
   body_func ty
 
 
-let rec string_of_list ty defenv l =
+let rec string_of_list ty defenv store l =
   let ty' = match ty with TyList ty' -> ty' | _ -> TyInt (* nonsense *) in
   let rec inner_loop l =
     match l with
       EmpV -> "]"
     | ConsV (head, rest) ->
-       "; " ^ (string_of_exval ty' defenv head) ^ (inner_loop rest)
+       "; " ^ (string_of_exval ty' defenv store head) ^ (inner_loop rest)
   in
   let str = inner_loop l in
   let str_length = String.length str in
   if str_length <= 2 then "[]"
   else "[" ^ String.sub str 2 (str_length - 2)
 
-and string_of_tuple ty defenv l =
+and string_of_tuple ty defenv store l =
   let tytup = match ty with TyTuple tytup -> tytup | _ -> TyEmpT (* nonsense *) in
   let rec inner_loop l tytup =
     match l, tytup with
       EmpTV, TyEmpT -> ")"
     | ConsTV (head, rest1), TyConsT (ty', rest2) ->
-       ", " ^ (string_of_exval ty' defenv head) ^ (inner_loop rest1 rest2)
+       ", " ^ (string_of_exval ty' defenv store head) ^ (inner_loop rest1 rest2)
     | _ -> err ("For debug: at string_of_tuple")
   in
   let str = inner_loop l tytup in
   let str_length = String.length str in
   "(" ^ String.sub str 2 (str_length - 2)
 
-and string_of_constr ty defenv name valueop =
+and string_of_constr ty defenv store name valueop =
   match valueop with
     None -> name
   | Some v ->
@@ -90,10 +94,10 @@ and string_of_constr ty defenv name valueop =
      let param_ty_assoc_list = List.combine param tys in
      let ty' = replace param_ty_assoc_list (List.assoc name more_body_l) in
      (match v with
-        ConstrV (_, Some _) -> name ^ " (" ^ (string_of_exval ty' defenv v) ^ ")"
-      | _ -> name ^ " " ^ (string_of_exval ty' defenv v))
+        ConstrV (_, Some _) -> name ^ " (" ^ (string_of_exval ty' defenv store v) ^ ")"
+      | _ -> name ^ " " ^ (string_of_exval ty' defenv store v))
 
-and string_of_record ty defenv l =
+and string_of_record ty defenv store l =
   let (id, tys) = match ty with TyRecord (x, l) -> (x, l) | _ -> ("", []) (* nonsense *) in
   let (param, body_l) = Environment.lookup id defenv in
   let param_ty_assoc_list = List.combine param tys in
@@ -102,7 +106,7 @@ and string_of_record ty defenv l =
     match body_l with
       [] -> "}"
     | Field (name, ty', _) :: rest ->
-       "; " ^ name ^ " = " ^ (string_of_exval (replace param_ty_assoc_list ty') defenv (List.assoc name recordval_assoc_list)) ^ (inner_loop rest)
+       "; " ^ name ^ " = " ^ (string_of_exval (replace param_ty_assoc_list ty') defenv store (List.assoc name recordval_assoc_list)) ^ (inner_loop rest)
     | _ -> err ("For debug: at string_of_record")
   in
   let str = inner_loop body_l in
@@ -110,18 +114,20 @@ and string_of_record ty defenv l =
   "{" ^ String.sub str 2 (str_length - 2)
 
 (* pretty printing *)
-and string_of_exval ty defenv = function
+and string_of_exval ty defenv store = function
     IntV i -> string_of_int i
   | BoolV b -> string_of_bool b
   | StringV s -> "\"" ^ s ^ "\""
-  | ConstrV (name, valueop) -> string_of_constr ty defenv name valueop
-  | RecordV l -> string_of_record ty defenv l
+  | ConstrV (name, valueop) -> string_of_constr ty defenv store name valueop
+  | RecordV l -> string_of_record ty defenv store l
   | ProcV (_, _, _) -> "<fun>"
   | DProcV (_, _) -> "<dfun>"
-  | ListV l -> string_of_list ty defenv l
-  | TupleV l -> string_of_tuple ty defenv l
+  | ListV l -> string_of_list ty defenv store l
+  | TupleV l -> string_of_tuple ty defenv store l
+  | UnitV -> "unit"
+  | RefV loc -> string_of_exval ty defenv store (Store.lookup loc store)
 
-let pp_val v ty defenv = print_string (string_of_exval ty defenv v)
+let pp_val v ty defenv store = print_string (string_of_exval ty defenv store v)
 
 
 
@@ -176,45 +182,52 @@ let rec apply_prim op arg1 arg2 =
   | _ -> err ("For debug : this error cannot occur")
 
 
-let rec apply_logic_prim op arg1 exp2 env = match op, arg1 with
+let rec apply_logic_prim op arg1 exp2 env store = match op, arg1 with
     And, BoolV b1 ->
      if b1 then
-       let arg2 = eval_exp env exp2 in
+       let (store', arg2) = eval_exp env store exp2 in
        (match arg2 with
-          BoolV _ -> arg2
+          BoolV _ -> (store', arg2)
         | _ -> err "For debug : this error cannot occur")
-     else BoolV false
+     else (store, BoolV false)
   | Or, BoolV b1 ->
-     if b1 then BoolV true
+     if b1 then (store, BoolV true)
      else
-       let arg2 = eval_exp env exp2 in
+       let (store', arg2) = eval_exp env store exp2 in
        (match arg2 with
-          BoolV _ -> arg2
+          BoolV _ -> (store', arg2)
         | _ -> err "For debug : this error cannot occur")
   | _ -> err ("For debug : this error cannot occur")
 
-and eval_exp env = function
+and eval_exp env store = function
     Var x ->
-     (try Environment.lookup x env with
+     (try
+        let v = Environment.lookup x env in
+        (match v with
+           RefV loc -> (store, Store.lookup loc store)
+         | _ -> (store, v))
+      with
         Environment.Not_bound -> err ("Variable not bound: " ^ x))
-  | ILit i -> IntV i
-  | BLit b -> BoolV b
-  | SLit s -> StringV s
+  | ILit i -> (store, IntV i)
+  | BLit b -> (store, BoolV b)
+  | SLit s -> (store, StringV s)
   | Constr (name, expop) ->
      (match expop with
-        None -> ConstrV (name, None)
+        None -> (store, ConstrV (name, None))
       | Some (exp, _) ->
-         let arg = eval_exp env exp in
-         ConstrV (name, Some arg))
+         let (store', arg) = eval_exp env store exp in
+         (store', ConstrV (name, Some arg)))
   | Record rexp ->
-      let rec eval_record rexp =
+     let rec eval_record store' rexp =
        match rexp with
-         EmpR -> EmpRV
+         EmpR -> (store', EmpRV)
        | ConsR ((name, (exp, _)), rest) ->
-          let value = eval_exp env exp in
-          ConsRV ((name, value), eval_record rest)
+          let (store'', value) = eval_exp env store' exp in
+          let (store''', rexp') = eval_record store'' rest in
+          (store''', ConsRV ((name, value), rexp'))
      in
-     RecordV (eval_record rexp)
+     let (store', rexp') = eval_record store rexp in
+     (store', RecordV rexp')
   | RecordWith ((exp, _), rexp) ->
      let rec assocList_of_recordval = function
          EmpRV -> []
@@ -229,53 +242,53 @@ and eval_exp env = function
            with
              Not_found -> ConsRV ((name, value), replace rest new_recordval_assoc_list))
      in
-     let old_value = eval_exp env exp in
-     let new_value = eval_exp env (Record rexp) in
+     let (store', old_value) = eval_exp env store exp in
+     let (store'', new_value) = eval_exp env store' (Record rexp) in
      (match old_value, new_value with
         RecordV old_recordval, RecordV new_recordval ->
          let l = replace old_recordval (assocList_of_recordval new_recordval) in
-         RecordV l
+         (store'', RecordV l)
       | _ -> err ("For debug: at case RecordWith in eval_exp"))
   | BinOp (op, (exp1, _), (exp2, _)) ->
-     let arg1 = eval_exp env exp1 in
-     let arg2 = eval_exp env exp2 in
-     apply_prim op arg1 arg2
+     let (store', arg1) = eval_exp env store exp1 in
+     let (store'', arg2) = eval_exp env store' exp2 in
+     (store'', apply_prim op arg1 arg2)
   | BinLogicOp (op, (exp1, _), (exp2, _)) ->
-     let arg1 = eval_exp env exp1 in
-     apply_logic_prim op arg1 exp2 env
+     let (store', arg1) = eval_exp env store exp1 in
+     apply_logic_prim op arg1 exp2 env store'
   | IfExp ((exp1, _), (exp2, _), (exp3, _)) ->
-     let test = eval_exp env exp1 in
+     let (store', test) = eval_exp env store exp1 in
      (match test with
-        BoolV true -> eval_exp env exp2
-      | BoolV false -> eval_exp env exp3
+        BoolV true -> eval_exp env store' exp2
+      | BoolV false -> eval_exp env store' exp3
       | _ -> err ("For debug : this error cannot occur"))
   | LetExp (l, (exp2, _)) ->
-     let rec eval_let_list l env' =
+     let rec eval_let_list l env' store' =
        match l with
-         [] -> eval_exp env' exp2
+         [] -> eval_exp env' store' exp2
        | ((id, _), (exp1, _)) :: rest ->
-          let value = eval_exp env exp1 in
+          let (store'', value) = eval_exp env store' exp1 in
           let newenv = Environment.extend id value env' in
-          eval_let_list rest newenv
+          eval_let_list rest newenv store''
      in
-     eval_let_list l env
-  | FunExp ((id, _), (exp, _)) -> ProcV (id, exp, ref env)
-  | DFunExp ((id, _), (exp, _)) -> DProcV (id, exp)
+     eval_let_list l env store
+  | FunExp ((id, _), (exp, _)) -> (store, ProcV (id, exp, ref env))
+  | DFunExp ((id, _), (exp, _)) -> (store, DProcV (id, exp))
   | AppExp ((exp1, _), (exp2, _)) ->
-     let funval = eval_exp env exp1 in
-     let arg = eval_exp env exp2 in
+     let (store', funval) = eval_exp env store exp1 in
+     let (store'', arg) = eval_exp env store' exp2 in
      (match funval with
         ProcV (id, body, env') ->
          let newenv = Environment.extend id arg !env' in
-         eval_exp newenv body
+         eval_exp newenv store'' body
       | DProcV (id, body) ->
          let newenv = Environment.extend id arg env in
-         eval_exp newenv body
+         eval_exp newenv store'' body
       | _ -> err ("For debug : this error cannot occur"))
   | LetRecExp (l, (exp2, _)) ->
      let rec eval_letrec_list l env =
        match l with
-         [] -> eval_exp !env exp2
+         [] -> eval_exp !env store exp2
        | ((id, _), ((FunExp ((para, _), (exp1, _))), _)) :: rest ->
           let value = ProcV (para, exp1, env) in
           let newenv = Environment.extend id value !env in
@@ -285,17 +298,19 @@ and eval_exp env = function
      in
      eval_letrec_list l (ref env)
   | ListExp lexp ->
-     let rec eval_list lexp =
+     let rec eval_list store' lexp =
        match lexp with
-         Emp -> EmpV
+         Emp -> (store', EmpV)
        | Cons ((exp, _), rest) ->
-          let value = eval_exp env exp in
-          ConsV (value, eval_list rest)
+          let (store'', value) = eval_exp env store' exp in
+          let (store''', lexp') = eval_list store'' rest in
+          (store''', ConsV (value, lexp'))
      in
-     ListV (eval_list lexp)
+     let (store', lexp') = eval_list store lexp in
+     (store', ListV lexp')
   | MatchExp ((exp, _), pattern_and_body_list) ->
      (* マッチする対象を評価 *)
-     let value = eval_exp env exp in
+     let (store', value) = eval_exp env store exp in
      (* (パターン列) -> (本体式) を順に取り出して処理 *)
      let rec main_loop = function
          [] -> err ("Not matched")
@@ -303,7 +318,7 @@ and eval_exp env = function
           try
             let id_and_value_list = pattern_match pattern value in
             let newenv = bind_and_return_env env id_and_value_list in
-            eval_exp newenv body
+            eval_exp newenv store' body
           with
             MatchError -> main_loop rest
      (* パターンマッチの結果束縛する必要がある変数を束縛した環境を返す *)
@@ -315,37 +330,52 @@ and eval_exp env = function
      in
      main_loop pattern_and_body_list
   | TupleExp texp ->
-     let rec eval_tuple texp =
+     let rec eval_tuple store' texp =
        match texp with
-         EmpT -> EmpTV
+         EmpT -> (store', EmpTV)
        | ConsT ((exp, _), rest) ->
-          let value = eval_exp env exp in
-          ConsTV (value, eval_tuple rest)
+          let (store'', value) = eval_exp env store' exp in
+          let (store''', texp') = eval_tuple store'' rest in
+          (store''', ConsTV (value, texp'))
      in
-     TupleV (eval_tuple texp)
+     let (store', texp') = eval_tuple store texp in
+     (store', TupleV texp')
+  | AssignExp ((record, _), name, (exp, _)) ->
+     let (store', recv) = eval_exp env store record in
+     let (store'', v) = eval_exp env store' exp in
+     (match recv with
+        RecordV recordval ->
+         let assoc_list = assocList_of_recordval recordval in
+         let refV = List.assoc name assoc_list in
+         (match refV with
+            RefV loc ->
+             let store''' = Store.update loc v store'' in
+             (store''', UnitV)
+          | _ -> err ("For debug: at AssignExp"))
+      | _ -> err ("For debug: at AssignExp"))
   | _ -> err ("not implemented yet")
 
 
-let eval_decl env = function
-    Exp (e, _) -> let v = eval_exp env e in [("-", env, v)]
+let eval_decl env store = function
+    Exp (e, _) -> let (store', v) = eval_exp env store e in [("-", env, store, v)]
   | Decls l ->
-     let rec make_decl_list l env =
+     let rec make_decl_list l env store =
        (match l with
           [] -> []
         | head :: outer_rest ->
-           let rec make_anddecl_list l env' =
+           let rec make_anddecl_list l env' store' =
              (match l with
-                [] -> env := env';
+                [] -> env := env'; store := store';
                       []
               | ((id, _), (e, _)) :: inner_rest ->
-                 let v = eval_exp !env e in
+                 let (store'', v) = eval_exp !env store' e in
                  let newenv = Environment.extend id v env' in
-                 (id, newenv, v) :: make_anddecl_list inner_rest newenv)
+                 (id, newenv, store'', v) ::  make_anddecl_list inner_rest newenv store'')
            in
-           let and_list = make_anddecl_list head !env in
-           and_list @ make_decl_list outer_rest env)
+           let and_list = make_anddecl_list head !env !store in
+           and_list @ make_decl_list outer_rest env store)
      in
-     make_decl_list l (ref env)
+     make_decl_list l (ref env) (ref store)
   | RecDecls l ->
      let rec make_recdecl_list l env =
        (match l with
@@ -358,7 +388,7 @@ let eval_decl env = function
                  let v = ProcV (para, body, env) in
                  let newenv = Environment.extend id v !env in
                  env := newenv;
-                 (id, newenv, v) :: make_andrecdecl_list inner_rest env
+                 (id, newenv, store, v) :: make_andrecdecl_list inner_rest env
               | _ -> err ("For debug : this error cannot occur"))
            in
            let and_list = make_andrecdecl_list head env in

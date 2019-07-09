@@ -26,6 +26,7 @@ type ty =
   | TyVariant of id * ty list
   | TyRecord of id * ty list
   | TyNone of name
+  | TyUnit
   | TySet of tyvar * ty MySet.t
 and tytuple = TyEmpT | TyConsT of ty * tytuple
 
@@ -70,6 +71,8 @@ type exp =
      | 1 -> 1 *)
   | TupleExp of tupleExp (* TupeExp (ConsT (ILit 3, ConsT (BLit true, EmpT))) --> (3, true) *)
   | RecordPattern of recordExp
+  | AssignExp of typedExp * name * typedExp
+  | Unit
   | Wildcard (* Wildcard --> _ *)
 and listExp = Emp | Cons of typedExp * listExp
 and tupleExp = EmpT | ConsT of typedExp * tupleExp
@@ -148,6 +151,7 @@ let make_tyvar_string_list ty =
     | TyUser (_, l) -> case_ty_list l ts_list
     | TyVariant (_, l) -> case_ty_list l ts_list
     | TyRecord (_, l) -> case_ty_list l ts_list
+    | TyUnit -> ts_list
     | _ -> err ("For debug: at make_tyvar_string_list")
   in
   body_func ty []
@@ -205,6 +209,7 @@ let rec string_of_ty ty =
     | TyRecord (x, l) ->
        if List.length l = 0 then remove_index x
        else string_of_param l ^ " " ^ remove_index x
+    | TyUnit -> "unit"
     | _ -> err ("For debug: at string_of_ty")
   in
   body_func ty
@@ -245,6 +250,7 @@ let rec freevar_ty ty =
   | TyVariant (_, l) -> freevar_ty_list l
   | TyRecord (_, l) -> freevar_ty_list l
   | TyNone _ -> MySet.empty
+  | TyUnit -> MySet.empty
   | TySet _ -> MySet.empty
   | _ -> err ("For debug: at freevar_ty")
 

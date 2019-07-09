@@ -226,6 +226,8 @@ let rec get_attached_ty_list (exp, att_ty) =
     | MatchExp (exp, l) -> (get_attached_ty_list exp) @ (from_exp_exp_list l)
     | TupleExp tupleExp -> from_tupleExp tupleExp
     | RecordPattern recordExp -> from_recordExp recordExp
+    | AssignExp (exp1, _, exp2) -> (get_attached_ty_list exp1) @ (get_attached_ty_list exp2)
+    | Unit -> []
     | Wildcard -> []
   in
   (from_exp exp) @ att_ty
@@ -300,6 +302,7 @@ let rec transform exp_with_ty stv_to_itv_list =
            | Field _ -> TyRecord (indexed_x, transform_att_ty_list tys))
         with
           Environment.Not_bound -> err ("type not defined: " ^ x))
+    | TyUnit -> TyUnit
     | _ -> err ("For debug : at transform_att_ty")
   and transform_att_tytuple = function
       TyEmpT -> TyEmpT
@@ -349,6 +352,8 @@ let rec transform exp_with_ty stv_to_itv_list =
       | MatchExp (l1, l2) -> MatchExp (body_func l1, transform_exp_exp_list l2)
       | TupleExp tupleExp -> TupleExp (transform_tupleExp tupleExp)
       | RecordPattern recordExp -> RecordPattern (transform_recordExp recordExp)
+      | AssignExp (exp1, name, exp2) -> AssignExp (body_func exp1, name, body_func exp2)
+      | Unit -> Unit
       | Wildcard -> Wildcard
     in
     (transform_exp exp, transform_att_ty_list att_ty)
@@ -374,6 +379,7 @@ let rec transform_decl decl stv_to_itv_list =
            | Field _ -> TyRecord (indexed_x, transform_att_ty_list tys))
         with
           Environment.Not_bound -> err ("type not defined: " ^ x))
+    | TyUnit -> TyUnit
     | _ -> err ("For debug : at transform_decl")
   and transform_att_ty_list = function
       [] -> []
@@ -399,6 +405,32 @@ let replace stv_to_itv_list ty =
     | TyVariant (id, l) -> TyVariant (id, case_ty_list l)
     | TyRecord (id, l) -> TyRecord (id, case_ty_list l)
     | TyNone name -> TyNone name
+    | TyUnit -> TyUnit
+    | _ -> err ("For debug: at replace")
+  and case_tytuple = function
+      TyEmpT -> TyEmpT
+    | TyConsT (ty', tytup') ->
+       TyConsT (body_func ty', case_tytuple tytup')
+  and case_ty_list = function
+      [] -> []
+    | head :: rest ->
+       body_func head :: case_ty_list rest
+  in
+  body_func ty
+
+let replace_another assoc_list ty =
+  let rec body_func = function
+      TyInt -> TyInt
+    | TyBool -> TyBool
+    | TyString -> TyString
+    | TyStringVar tyvar -> List.assoc tyvar assoc_list
+    | TyFun (domty, ranty) -> TyFun (body_func domty, body_func ranty)
+    | TyList ty' -> TyList (body_func ty')
+    | TyTuple tytup -> TyTuple (case_tytuple tytup)
+    | TyVariant (id, l) -> TyVariant (id, case_ty_list l)
+    | TyRecord (id, l) -> TyRecord (id, case_ty_list l)
+    | TyNone name -> TyNone name
+    | TyUnit -> TyUnit
     | _ -> err ("For debug: at replace")
   and case_tytuple = function
       TyEmpT -> TyEmpT
@@ -524,7 +556,7 @@ and ty_exp tyenv = function
      (s, TyInt, [])
   | (BLit _, att_ty) ->
      let eqs = make_eqs_about_att_ty TyBool att_ty in
-     let s =unify eqs in
+     let s = unify eqs in
      (s, TyBool, [])
   | (SLit _, att_ty) ->
      let eqs = make_eqs_about_att_ty TyString att_ty in
@@ -638,13 +670,13 @@ and ty_exp tyenv = function
      let s4 = squeeze_subst (unify eqs) in
      (s4, subst_type s4 ty2, rel1 @ rel2 @ rel3)
   | (LetExp (l, exp2), att_ty) ->
-     let rec ty_let_list l tyenv' subst id_l rel =
+     let rec ty_let_list l tyenv' subst id_l =
        match l with
          [] ->
           let (s3, ty2, rel2) = ty_exp tyenv' exp2 in
           let eqs = (eqs_of_subst subst) @ (eqs_of_subst s3) @ (make_eqs_about_att_ty ty2 att_ty) in
           let s4 = squeeze_subst (unify eqs) in
-          (s4, subst_type s4 ty2, rel2 @ rel)
+          (s4, subst_type s4 ty2, rel2)
        | ((id, att_ty'), exp1) :: rest ->
           if List.exists (fun x -> x = id) id_l then
             err ("one variable is bound several times in this expression")
@@ -652,11 +684,13 @@ and ty_exp tyenv = function
             let (s1, ty1, rel1) = ty_exp tyenv exp1 in
             let eqs = (eqs_of_subst s1) @ (make_eqs_about_att_ty ty1 att_ty') in
             let s2 = squeeze_subst (unify eqs) in
-            let tysc = closure ty1 tyenv s2 in
+            let s3 = finalize_subst s2 in
+            let s4 = unify (eqs_of_subst (s3 @ reflect_dependency rel1 s3)) in
+            let tysc = closure ty1 tyenv s4 in
             let newtyenv = Environment.extend id tysc tyenv' in
-            ty_let_list rest newtyenv (s2 @ subst) (id :: id_l) (rel1 @ rel)
+            ty_let_list rest newtyenv (s4 @ subst) (id :: id_l)
      in
-     ty_let_list l tyenv [] [] []
+     ty_let_list l tyenv [] []
   | (FunExp ((id, att_ty'), exp), att_ty) ->
      let domty = TyVar (fresh_tyvar ()) in
      let (s1, ranty, rel) = ty_exp (Environment.extend id (TyScheme ([], domty)) tyenv) exp in
@@ -840,6 +874,55 @@ and ty_exp tyenv = function
      let eqs = field_eqs @ this_eqs @ make_eqs_about_att_ty (TyVar alpha) att_ty in
      let s = squeeze_subst (unify eqs) in
      (s, subst_type s (TyVar alpha), rel)
+  | (AssignExp (exp1, name, exp2), att_ty) ->
+     let rec extract x = function
+         [] -> err ("For debug: at extract")
+       | head :: rest ->
+          (match head with
+             Field (x', arg_ty, mutability) when x = x' -> (arg_ty, mutability)
+           | _ -> extract x rest)
+     in
+     (try
+        let (s1, ty1, rel1) = ty_exp tyenv exp1 in
+        let candidates = List.map (fun (_, y) -> y) (Rev_environment.lookup name !rev_defenv) in
+        let alpha = fresh_tyvar () in
+        let ty_assoc_list = make_this_ty_assoc_list candidates in
+        let f this_ty_name =
+          let stv_to_itv_list = List.assoc this_ty_name ty_assoc_list in
+          let (_, tyvars) = List.split stv_to_itv_list in
+          let tyVars = List.map (fun tyvar -> TyVar tyvar) tyvars in
+          TyRecord (this_ty_name, tyVars) in
+        let ty_set = MySet.from_list (List.map f candidates) in
+        let s2 =
+          if MySet.length ty_set = 1 then
+            unify [(TyVar alpha, (List.hd (MySet.to_list ty_set))); (TyVar alpha, ty1)]
+          else
+            unify [(TyVar alpha, TySet (alpha, ty_set)); (TyVar alpha, ty1)] in
+        let eqs1 = (eqs_of_subst s1) @ (eqs_of_subst (squeeze_subst s2)) in
+        let s3 = squeeze_subst (unify eqs1) in
+        let s4 = finalize_subst s3 in
+        let s5 = unify (eqs_of_subst (s4 @ reflect_dependency rel1 s4)) in
+        let ty2 = subst_type s5 (TyVar alpha) in
+        (match ty2 with
+           TyRecord (ty_name, l) ->
+            let (param, body_l) = Environment.lookup ty_name !recdefenv in
+            let (arg_ty, mutability) = extract ty_name body_l in
+            (match mutability with
+               Mutable ->
+                let assoc_list = List.combine param l in
+                let replaced_arg_ty = replace_another assoc_list arg_ty in
+                let (s6, ty3, rel2) = ty_exp tyenv exp2 in
+                let eqs2 = (eqs_of_subst s5) @ (eqs_of_subst s6) @ [(replaced_arg_ty, ty3)] @ (make_eqs_about_att_ty TyUnit att_ty) in
+                let s7 = squeeze_subst (unify eqs2) in
+                (s7, TyUnit, rel2)
+             | Immutable -> err ("The record field " ^ name ^ " is not mutable"))
+         | _ -> err ("For debug: at AssignExp"))
+      with
+        Rev_environment.Not_bound -> err ("record field not bound: " ^ name))
+  | (Unit, att_ty) ->
+     let eqs = make_eqs_about_att_ty TyUnit att_ty in
+     let s = squeeze_subst (unify eqs) in
+     (s, TyUnit, [])
   | (Wildcard, att_ty) ->
      let ty = TyVar (fresh_tyvar ()) in
      let eqs = make_eqs_about_att_ty ty att_ty in

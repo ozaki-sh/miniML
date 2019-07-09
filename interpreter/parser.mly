@@ -14,9 +14,10 @@ open Syntax
 %token COMMA UNDERSCORE
 %token COLON
 %token INT BOOL STRING LIST
-%token LCLYBRA RCLYBRA DOT MUTABLE
+%token LCLYBRA RCLYBRA DOT MUTABLE LARROW
 %token REF COLONEQ EXCLM
 %token TYPE OF
+%token UNIT
 
 %token <int> INTV
 %token <Syntax.id> ID
@@ -72,6 +73,17 @@ Expr :
   | e=LetRecExpr { e }
   | e=MatchExpr { e }
   | e=TupleHeadExpr { (TupleExp e, []) }
+  | e=RcdAssignExpr { e }
+
+NotTupleExpr :
+    e=IfExpr { e }
+  | e=OrExpr { e }
+  | e=LetExpr { e }
+  | e=FunExpr { e }
+  | e=DFunExpr { e }
+  | e=LetRecExpr { e }
+  | e=MatchExpr { e }
+  | e=RcdAssignExpr { e }
 
 LookRightExpr :
     e=IfExpr { e }
@@ -160,8 +172,9 @@ AExpr :
   | e=ListHeadExpr { (ListExp e, []) }
   | e=RecordHeadExpr { (Record e, []) }
   | e=RecordWithHeadExpr { let (old, l) = e in (RecordWith (old, l), []) }
+  | LPAREN RPAREN { (Unit, []) }
   | LPAREN e=Expr RPAREN { e }
-  | LPAREN e=Expr COLON ty=TupleType RPAREN { let (e', l) = e in (e', ty :: l) }
+  | LPAREN e=Expr COLON ty=FunType RPAREN { let (e', l) = e in (e', ty :: l) }
 
 ListHeadExpr :
     LBOXBRA e=Expr lst=ListTailExpr { Cons (e, lst) }
@@ -238,12 +251,16 @@ LetRecAndExpr :
 MatchExpr :
     MATCH e1=Expr WITH option(BAR) e2=PatternMatchExpr { (MatchExp (e1 , e2), []) }
 
-TupleTailExpr :
-    COMMA e=Expr { ConsT (e, EmpT) }
-  | COMMA e=Expr lst=TupleTailExpr { ConsT (e, lst) }
-
 TupleHeadExpr :
     e=Expr lst=TupleTailExpr { ConsT (e, lst) }
+
+TupleTailExpr :
+    COMMA e=NotTupleExpr { ConsT (e, EmpT) }
+  | COMMA e=NotTupleExpr lst=TupleTailExpr { ConsT (e, lst) }
+
+RcdAssignExpr :
+    r=Expr DOT x=ID LARROW e=RcdAssignExpr { (AssignExp (r, x, e), []) }
+
 
 Pattern :
     pt=TuplePattern { pt }
@@ -252,12 +269,12 @@ TuplePattern :
     pt=TupleHeadPattern { (TupleExp pt, []) }
   | pt=ConsPattern { pt }
 
-TupleTailPattern :
-    COMMA pt=Pattern { ConsT (pt, EmpT) }
-  | COMMA pt=Pattern lst=TupleTailPattern { ConsT (pt, lst) }
-
 TupleHeadPattern :
     pt=Pattern lst=TupleTailPattern { ConsT (pt, lst) }
+
+TupleTailPattern :
+    COMMA pt=ConsPattern { ConsT (pt, EmpT) }
+  | COMMA pt=ConsPattern lst=TupleTailPattern { ConsT (pt, lst) }
 
 ConsPattern :
     ptl=CnstrPattern CONS ptr=ConsPattern { (BinOp (Cons, ptl, ptr), []) }
@@ -277,9 +294,10 @@ APattern :
   | LBOXBRA RBOXBRA { (ListExp Emp, []) }
   | pt=ListHeadPattern { (ListExp pt, []) }
   | pt=RecordHeadPattern { (RecordPattern pt, []) }
+  | LPAREN RPAREN { (Unit, []) }
   | UNDERSCORE { (Wildcard, []) }
   | LPAREN pt=Pattern RPAREN { pt }
-  | LPAREN pt=Pattern COLON ty=TupleType RPAREN { let (pt', l) = pt in (pt', ty :: l) }
+  | LPAREN pt=Pattern COLON ty=FunType RPAREN { let (pt', l) = pt in (pt', ty :: l) }
 
 ListHeadPattern :
     LBOXBRA pt=Pattern lst=ListTailPattern { Cons (pt, lst) }
@@ -319,11 +337,11 @@ MorePattern :
     BAR pt=Pattern { pt }
 
 WithType :
-    COLON ty=TupleType { ty }
+    COLON ty=FunType { ty }
 
 IDt :
     x=ID { (x, []) }
-  | LPAREN x=IDt COLON ty=TupleType RPAREN { let (x', l) = x in (x', ty :: l) }
+  | LPAREN x=IDt COLON ty=FunType RPAREN { let (x', l) = x in (x', ty :: l) }
 
 Type :
     option(BAR) v=VariantType l=list(MoreVariantType) { v :: l }
@@ -337,7 +355,7 @@ MoreVariantType :
     BAR v=VariantType { v }
 
 Arg :
-    t=TupleType { t }
+    t=FunType { t }
 
 RecordHeadType :
     LCLYBRA r=RecordType lst=RecordTailType { r :: lst }
@@ -347,8 +365,8 @@ RecordTailType :
   | option(SEMI) RCLYBRA { [] }
 
 RecordType :
-    x=ID COLON ty=TupleType { Field (x, ty, Immutable) }
-  | MUTABLE x=ID COLON ty=TupleType { Field (x, ty, Mutable) }
+    x=ID COLON ty=FunType { Field (x, ty, Immutable) }
+  | MUTABLE x=ID COLON ty=FunType { Field (x, ty, Mutable) }
 
 Parameters :
     tv=TYVAR { [tv] }
@@ -359,26 +377,26 @@ ListedParameters :
   | tv=TYVAR COMMA tvs=ListedParameters { tv :: tvs }
 
 TypeParameters :
-    ty=TupleType { [ty] }
+    ty=FunType { [ty] }
   | LPAREN tys=ListedTypeParameters RPAREN { tys }
 
 ListedTypeParameters :
-    ty=TupleType { [ty] }
-  | ty=TupleType COMMA tys=ListedTypeParameters { ty :: tys }
+    ty=FunType { [ty] }
+  | ty=FunType COMMA tys=ListedTypeParameters { ty :: tys }
+
+FunType :
+    ty1=TupleType RARROW ty2=FunType { TyFun (ty1, ty2) }
+  | ty=TupleType { ty }
+
+TupleHeadType :
+    ty1=FunType ty2=TupleTailType { TyConsT (ty1, ty2) }
 
 TupleTailType :
     MULT ty=TupleType { TyConsT (ty, TyEmpT) }
   | MULT ty1=TupleType ty2=TupleTailType { TyConsT (ty1, ty2) }
 
-TupleHeadType :
-    ty1=TupleType ty2=TupleTailType { TyConsT (ty1, ty2) }
-
 TupleType :
     ty=TupleHeadType { TyTuple ty }
-  | ty=FunType { ty }
-
-FunType :
-    ty1=AType RARROW ty2=FunType { TyFun (ty1, ty2) }
   | ty=AType { ty }
 
 AType :
@@ -389,7 +407,8 @@ AType :
   | ty=AType LIST { TyList ty }
   | x=ID { TyUser (x, []) }
   | tys=TypeParameters x=ID { TyUser (x, tys) }
-  | LPAREN ty=TupleType RPAREN { ty }
+  | UNIT { TyUnit }
+  | LPAREN ty=FunType RPAREN { ty }
 
 
 

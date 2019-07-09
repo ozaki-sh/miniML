@@ -5,13 +5,13 @@ open Define
 
 let debug = ref false
 
-let rec read_eval_print env tyenv defenv rev_defenv =
+let rec read_eval_print env tyenv defenv rev_defenv store =
   print_string "# ";
   flush stdout;
   let print_error_and_go s =
     print_string s;
     print_newline();
-    read_eval_print env tyenv defenv rev_defenv
+    read_eval_print env tyenv defenv rev_defenv store
   in
   try
     let decl = Parser.toplevel Lexer.main (Lexing.from_channel stdin) in
@@ -34,7 +34,7 @@ let rec read_eval_print env tyenv defenv rev_defenv =
             inner_display rest false
        and outer_display l =
          match l with
-           [] -> read_eval_print env tyenv newdefenv newrev_defenv
+           [] -> read_eval_print env tyenv newdefenv newrev_defenv store
          | head :: rest ->
             inner_display head true;
             outer_display rest
@@ -43,19 +43,19 @@ let rec read_eval_print env tyenv defenv rev_defenv =
     | _ ->
        let (vardefenv, recdefenv) = Environment.partition (fun (_, body_l) -> match List.hd body_l with Constructor _ -> true | _ -> false) defenv in
        let tys = ty_decl tyenv defenv vardefenv recdefenv rev_defenv decl in
-       let decls = eval_decl env decl in
-       let rec list_process exp_l ty_l env tyenv res_l =
+       let decls = eval_decl env store decl in
+       let rec list_process exp_l ty_l env tyenv store res_l =
          match exp_l, ty_l with
-           [], [] -> (env, tyenv, res_l)
-         | ((_, newenv, _) as exp_set :: exp_rest), ((newtyenv, _) as ty_set :: ty_rest) ->
-            list_process exp_rest ty_rest newenv newtyenv ((exp_set, ty_set) :: res_l)
-         | _ -> (env, tyenv, res_l) (* this line cannot be done *)
+           [], [] -> (env, tyenv, store, res_l)
+         | ((_, newenv, newstore, _) as exp_set :: exp_rest), ((newtyenv, _) as ty_set :: ty_rest) ->
+            list_process exp_rest ty_rest newenv newtyenv newstore ((exp_set, ty_set) :: res_l)
+         | _ -> (env, tyenv, store, res_l) (* this line cannot be done *)
        in
-       let (newenv, newtyenv, returned_result_list) = list_process decls tys env tyenv [] in
+       let (newenv, newtyenv, newstore, returned_result_list) = list_process decls tys env tyenv store [] in
        let rec remove_duplication l id_l =
          match l with
            [] -> []
-         | ((id, _, _) as exp_h, ty_h) :: rest ->
+         | ((id, _, _, _) as exp_h, ty_h) :: rest ->
             if List.exists (fun x -> x = id) id_l then
               remove_duplication rest id_l
             else
@@ -64,12 +64,12 @@ let rec read_eval_print env tyenv defenv rev_defenv =
        let once_list = remove_duplication returned_result_list [] in
        let rec display l =
          match l with
-           [] -> read_eval_print newenv newtyenv defenv rev_defenv
-         | ((id, _, v), (_, t)) :: rest ->
+           [] -> read_eval_print newenv newtyenv defenv rev_defenv newstore
+         | ((id, _, _, v), (_, t)) :: rest ->
             Printf.printf "val %s : " id;
             pp_ty t;
             print_string " = ";
-            pp_val v t defenv;
+            pp_val v t defenv newstore;
             print_newline();
             display rest
        in
@@ -85,7 +85,7 @@ let rec read_eval_print env tyenv defenv rev_defenv =
 (*  | _ -> print_error_and_go "Error! cause is unknown"*)
 
 
-let read_eval_print_from_file env tyenv defenv rev_defenv filename =
+let read_eval_print_from_file env tyenv defenv rev_defenv store filename =
   flush stdout;
   let file = open_in filename in
   let str = ref "" in
@@ -106,16 +106,16 @@ let read_eval_print_from_file env tyenv defenv rev_defenv filename =
       with
         Invalid_argument _ -> l
     in
-    let rec inner_loop env tyenv defenv rev_defenv str_list =
+    let rec inner_loop env tyenv defenv rev_defenv store str_list =
       match str_list with
         [] -> print_string "---end of file---";
               print_newline();
-              read_eval_print env tyenv defenv rev_defenv
+              read_eval_print env tyenv defenv rev_defenv store
       | str :: str_rest ->
          let print_error_and_go s =
            print_string s;
            print_newline();
-           inner_loop env tyenv defenv rev_defenv str_rest
+           inner_loop env tyenv defenv rev_defenv store str_rest
          in
          try
            let decl = Parser.toplevel Lexer.main (Lexing.from_string str) in
@@ -138,7 +138,7 @@ let read_eval_print_from_file env tyenv defenv rev_defenv filename =
                    inner_display rest false
               and outer_display l =
                 match l with
-                  [] -> inner_loop env tyenv newdefenv newrev_defenv str_rest
+                  [] -> inner_loop env tyenv newdefenv newrev_defenv store str_rest
                 | head :: rest ->
                    inner_display head true;
                    outer_display rest
@@ -147,19 +147,19 @@ let read_eval_print_from_file env tyenv defenv rev_defenv filename =
             | _ ->
                let (vardefenv, recdefenv) = Environment.partition (fun (_, body_l) -> match List.hd body_l with Constructor _ -> true | _ -> false) defenv in
                let tys = ty_decl tyenv defenv vardefenv recdefenv rev_defenv decl in
-               let decls = eval_decl env decl in
-               let rec list_process exp_l ty_l env tyenv res_l =
+               let decls = eval_decl env store decl in
+               let rec list_process exp_l ty_l env tyenv store res_l =
                  match exp_l, ty_l with
-                   [], [] -> (env, tyenv, res_l)
-                 | ((_, newenv, _) as exp_set :: exp_rest), ((newtyenv, _) as ty_set :: ty_rest) ->
-                    list_process exp_rest ty_rest newenv newtyenv ((exp_set, ty_set) :: res_l)
-                 | _ -> (env, tyenv, res_l) (* this line cannot be done *)
+                   [], [] -> (env, tyenv, store, res_l)
+                 | ((_, newenv, newstore, _) as exp_set :: exp_rest), ((newtyenv, _) as ty_set :: ty_rest) ->
+                    list_process exp_rest ty_rest newenv newtyenv newstore ((exp_set, ty_set) :: res_l)
+                 | _ -> (env, tyenv, store, res_l) (* this line cannot be done *)
                in
-               let (newenv, newtyenv, returned_result_list) = list_process decls tys env tyenv [] in
+               let (newenv, newtyenv, newstore, returned_result_list) = list_process decls tys env tyenv store [] in
                let rec remove_duplication l id_l =
                  match l with
                    [] -> []
-                 | ((id, _, _) as exp_h, ty_h) :: rest ->
+                 | ((id, _, _, _) as exp_h, ty_h) :: rest ->
                     if List.exists (fun x -> x = id) id_l then
                       remove_duplication rest id_l
                     else
@@ -168,12 +168,12 @@ let read_eval_print_from_file env tyenv defenv rev_defenv filename =
                let once_list = remove_duplication returned_result_list [] in
                let rec display l =
                  match l with
-                   [] -> inner_loop newenv newtyenv defenv rev_defenv str_rest
-                 | ((id, _, v), (_, t)) :: rest ->
+                   [] -> inner_loop newenv newtyenv defenv rev_defenv newstore str_rest
+                 | ((id, _, _, v), (_, t)) :: rest ->
                     Printf.printf "val %s : " id;
                     pp_ty t;
                     print_string " = ";
-                    pp_val v t defenv;
+                    pp_val v t defenv newstore;
                     print_newline();
                     display rest in
                display (List.rev once_list))
@@ -188,7 +188,7 @@ let read_eval_print_from_file env tyenv defenv rev_defenv filename =
          | Syntax.Error s -> print_error_and_go ("Error! " ^ s)
          | _ -> print_error_and_go "Error! cause is unknown"
     in
-    inner_loop env tyenv defenv rev_defenv (List.rev (get_str_list_by_semisemi 0 1 0 []))
+    inner_loop env tyenv defenv rev_defenv store (List.rev (get_str_list_by_semisemi 0 1 0 []))
 
 
 let option = "-1#option"
@@ -218,15 +218,17 @@ let initial_rev_defenv =
   Rev_environment.extend "None" (TyNone "None", option)
     (Rev_environment.extend "Some" (TyStringVar "'a", option) (Rev_environment.empty))
 
+let initial_store = Store.empty
+
 let _ =
   try
     let str  = Sys.argv.(1) in
     if str = "-d" then
       (debug := true;
        let filename = Sys.argv.(2) in
-       read_eval_print_from_file initial_env initial_tyenv initial_defenv initial_rev_defenv filename)
+       read_eval_print_from_file initial_env initial_tyenv initial_defenv initial_rev_defenv initial_store filename)
     else
       let filename = str in
-      read_eval_print_from_file initial_env initial_tyenv initial_defenv initial_rev_defenv filename
+      read_eval_print_from_file initial_env initial_tyenv initial_defenv initial_rev_defenv initial_store filename
   with
-    Invalid_argument _ -> read_eval_print initial_env initial_tyenv initial_defenv initial_rev_defenv
+    Invalid_argument _ -> read_eval_print initial_env initial_tyenv initial_defenv initial_rev_defenv initial_store

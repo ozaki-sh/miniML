@@ -76,6 +76,8 @@ and string_of_exp = function
   | TupleExp texp ->
      "TupleExp " ^ (string_of_tupleExp texp)
   | RecordPattern rexp -> "RecordPattern " ^ (string_of_recordExp rexp)
+  | AssignExp ((exp1, _), name, (exp2, _)) -> "AssignExp (" ^ (string_of_exp exp1) ^ ", " ^ name ^ ", " ^ (string_of_exp exp2) ^ ")"
+  | Unit -> "Unit"
   | Wildcard -> "Wildcard"
 
 let rec string_of_tytuple = function
@@ -109,6 +111,7 @@ and string_of_tyrow = function
   | TyVariant (name, l) -> "TyVariant (" ^ name ^ ", " ^ string_of_ty_list l ^ ")"
   | TyRecord (name, l) -> "TyRecord (" ^ name ^ ", " ^ string_of_ty_list l ^ ")"
   | TyNone _ -> "TyNone"
+  | TyUnit -> "TyUnit"
   | TySet (tyvar, l) -> "TySet (" ^ (string_of_int tyvar) ^ ", " ^ (List.fold_left (fun x y -> x ^ "; " ^ y) "" ((List.map (fun x -> string_of_tyrow x) (MySet.to_list l)))) ^ ")"
 
 let rec string_of_tydecl = function
