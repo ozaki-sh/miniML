@@ -13,3 +13,5 @@ let rec update l v = function
   | (l', v') :: rest ->
      if l = l' then (l, v) :: rest
      else (l', v') :: update l v rest
+
+let to_list store = store

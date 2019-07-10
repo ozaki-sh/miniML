@@ -191,34 +191,6 @@ let read_eval_print_from_file env tyenv defenv rev_defenv store filename =
     inner_loop env tyenv defenv rev_defenv store (List.rev (get_str_list_by_semisemi 0 1 0 []))
 
 
-let option = "-1#option"
-
-let option_body =
-  let param = ["'a"] in
-  let body =
-    [Constructor ("None", TyNone "None");
-     Constructor ("Some", TyStringVar "'a")] in
-  (param, body)
-
-
-let initial_env =
-  Environment.extend "i" (IntV 1)
-    (Environment.extend "v" (IntV 5)
-      (Environment.extend "x" (IntV 10) Environment.empty))
-
-let initial_tyenv =
-  Environment.extend "i" (TyScheme ([], TyInt))
-    (Environment.extend "v" (TyScheme ([], TyInt))
-      (Environment.extend "x" (TyScheme ([], TyInt)) Environment.empty))
-
-let initial_defenv =
-  Environment.extend option option_body (Environment.empty)
-
-let initial_rev_defenv =
-  Rev_environment.extend "None" (TyNone "None", option)
-    (Rev_environment.extend "Some" (TyStringVar "'a", option) (Rev_environment.empty))
-
-let initial_store = Store.empty
 
 let _ =
   try
@@ -226,9 +198,9 @@ let _ =
     if str = "-d" then
       (debug := true;
        let filename = Sys.argv.(2) in
-       read_eval_print_from_file initial_env initial_tyenv initial_defenv initial_rev_defenv initial_store filename)
+       read_eval_print_from_file Initial.env Initial.tyenv Initial.defenv Initial.rev_defenv Initial.store filename)
     else
       let filename = str in
-      read_eval_print_from_file initial_env initial_tyenv initial_defenv initial_rev_defenv initial_store filename
+      read_eval_print_from_file Initial.env Initial.tyenv Initial.defenv Initial.rev_defenv Initial.store filename
   with
-    Invalid_argument _ -> read_eval_print initial_env initial_tyenv initial_defenv initial_rev_defenv initial_store
+    Invalid_argument _ -> read_eval_print Initial.env Initial.tyenv Initial.defenv Initial.rev_defenv Initial.store

@@ -16,7 +16,6 @@ let reservedWords = [
   ("mutable", Parser.MUTABLE);
   ("of", Parser.OF);
   ("rec", Parser.REC);
-  ("ref", Parser.REF);
   ("string", Parser.STRING);
   ("then", Parser.THEN);
   ("true", Parser.TRUE);

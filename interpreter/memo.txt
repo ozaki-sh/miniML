@@ -51,3 +51,9 @@ this_ty?
 
 
 Assign -> 環境を書き換える
+
+
+
+r.x <- 0
+
+if < ; < fun < if

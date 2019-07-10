@@ -167,3 +167,5 @@ let rec string_of_eqs eqs =
     (fun x y -> x ^ "; " ^ y)
     (List.map (fun (ty1, ty2) -> "(" ^ (string_of_tyrow ty1) ^ ", " ^ (string_of_tyrow ty2) ^ ")") eqs)
     ""
+
+

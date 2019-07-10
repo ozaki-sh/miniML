@@ -24,6 +24,40 @@ and tupleval = EmpTV | ConsTV of exval * tupleval
 and recordval = EmpRV | ConsRV of (name * exval) * recordval
 and dnval = exval
 
+let rec string_of_recordval = function
+    EmpRV -> "EmpRV"
+  | ConsRV ((name, value), rest) ->
+     "ConsRV ((" ^ name ^ ", " ^ string_of_exvalrow value ^ "), " ^ string_of_recordval rest ^ ")"
+
+and string_of_listval = function
+    EmpV -> "EmpV"
+  | ConsV (value, rest) -> "ConsV (" ^ string_of_exvalrow value ^ ", " ^ string_of_listval rest ^ ")"
+
+and string_of_tupleval = function
+    EmpTV -> "EmpTV"
+  | ConsTV (value, rest) -> "ConsTV (" ^ string_of_exvalrow value ^ ", " ^ string_of_tupleval rest ^ ")"
+
+and string_of_exvalrow = function
+    IntV i -> "IntV " ^ string_of_int i
+  | BoolV b -> "BoolV " ^ string_of_bool b
+  | StringV s -> "StringV " ^ s
+  | ConstrV (name, valop) ->
+     (match valop with
+        None -> "ConstrV " ^ name
+      | Some value -> "ConstrV (" ^ name ^ ", " ^ string_of_exvalrow value ^ ")")
+  | RecordV recval -> "RecordV " ^ string_of_recordval recval
+  | ProcV (id, exp, env) -> "ProcV (" ^ id ^ ", exp, env)"
+  | DProcV (id, exp) -> "DProcV (" ^ id ^ ", exp)"
+  | ListV listval -> "ListV " ^ string_of_listval listval
+  | TupleV tupleval -> "TupleV " ^ string_of_tupleval tupleval
+  | UnitV -> "UnitV"
+  | RefV loc -> "RefV " ^ string_of_int loc
+
+let rec string_of_store = function
+    [] -> ""
+  | (loc, value) :: rest ->
+     "(" ^ string_of_int loc ^ ", " ^ string_of_exvalrow value ^ ") " ^ string_of_store rest
+
 
 exception Error of string
 exception MatchError
@@ -124,7 +158,7 @@ and string_of_exval ty defenv store = function
   | DProcV (_, _) -> "<dfun>"
   | ListV l -> string_of_list ty defenv store l
   | TupleV l -> string_of_tuple ty defenv store l
-  | UnitV -> "unit"
+  | UnitV -> "()"
   | RefV loc -> string_of_exval ty defenv store (Store.lookup loc store)
 
 let pp_val v ty defenv store = print_string (string_of_exval ty defenv store v)
@@ -159,6 +193,7 @@ let rec pattern_match pattern value =
   | TupleExp EmpT, TupleV EmpTV -> []
   | TupleExp (ConsT ((pt, _), l1)), TupleV (ConsTV (v, l2)) ->
      (pattern_match pt v) @ (pattern_match (TupleExp l1) (TupleV l2))
+  | Unit, UnitV -> []
   | Wildcard, _ -> []
   | _, _ -> raise MatchError
 
@@ -223,8 +258,10 @@ and eval_exp env store = function
          EmpR -> (store', EmpRV)
        | ConsR ((name, (exp, _)), rest) ->
           let (store'', value) = eval_exp env store' exp in
-          let (store''', rexp') = eval_record store'' rest in
-          (store''', ConsRV ((name, value), rexp'))
+          let loc = fresh_location () in
+          let newstore = Store.extend loc value store'' in
+          let (store''', rexp') = eval_record newstore rest in
+          (store''', ConsRV ((name, RefV loc), rexp'))
      in
      let (store', rexp') = eval_record store rexp in
      (store', RecordV rexp')
@@ -353,11 +390,12 @@ and eval_exp env store = function
              (store''', UnitV)
           | _ -> err ("For debug: at AssignExp"))
       | _ -> err ("For debug: at AssignExp"))
+  | Unit -> (store, UnitV)
   | _ -> err ("not implemented yet")
 
 
 let eval_decl env store = function
-    Exp (e, _) -> let (store', v) = eval_exp env store e in [("-", env, store, v)]
+    Exp (e, _) -> let (store', v) = eval_exp env store e in [("-", env, store', v)]
   | Decls l ->
      let rec make_decl_list l env store =
        (match l with

@@ -15,7 +15,7 @@ open Syntax
 %token COLON
 %token INT BOOL STRING LIST
 %token LCLYBRA RCLYBRA DOT MUTABLE LARROW
-%token REF COLONEQ EXCLM
+%token COLONEQ EXCLM
 %token TYPE OF
 %token UNIT
 
@@ -66,24 +66,13 @@ TypeAndDecl :
 
 Expr :
     e=IfExpr { e }
-  | e=OrExpr { e }
+  | e=AssignExpr { e }
   | e=LetExpr { e }
   | e=FunExpr { e }
   | e=DFunExpr { e }
   | e=LetRecExpr { e }
   | e=MatchExpr { e }
-  | e=TupleHeadExpr { (TupleExp e, []) }
-  | e=RcdAssignExpr { e }
-
-NotTupleExpr :
-    e=IfExpr { e }
-  | e=OrExpr { e }
-  | e=LetExpr { e }
-  | e=FunExpr { e }
-  | e=DFunExpr { e }
-  | e=LetRecExpr { e }
-  | e=MatchExpr { e }
-  | e=RcdAssignExpr { e }
+  | e=ContinueExpr { e }
 
 LookRightExpr :
     e=IfExpr { e }
@@ -92,6 +81,24 @@ LookRightExpr :
   | e=DFunExpr { e }
   | e=LetRecExpr { e }
   | e=MatchExpr { e }
+
+NotContinueExpr :
+    e=IfExpr { e }
+  | e=AssignExpr { e }
+  | e=LetExpr { e }
+  | e=FunExpr { e }
+  | e=DFunExpr { e }
+  | e=LetRecExpr { e }
+  | e=MatchExpr { e }
+
+AssignExpr :
+    r=ProjExpr DOT x=ID LARROW e=AssignExpr { (AssignExp (r, x, e), []) }
+  | r=TupleExpr COLONEQ e=AssignExpr { (AppExp ((AppExp ((Var "_assign", []), r), []), e), []) }
+  | e=TupleExpr { e }
+
+TupleExpr :
+    e=TupleHeadExpr { (TupleExp e, []) }
+  | e=OrExpr { e }
 
 OrExpr :
     l=OrExpr OR r=AndExpr { (BinLogicOp(Or, l, r), []) }
@@ -119,6 +126,7 @@ ConsExpr :
 
 HExpr :
     l=HExpr HAT r=PMExpr { (BinOp (Hat, l, r), []) }
+  | l=HExpr HAT r=LookRightExpr { (BinOp (Hat, l, r), []) }
   | e=PMExpr { e }
 
 PMExpr :
@@ -172,6 +180,7 @@ AExpr :
   | e=ListHeadExpr { (ListExp e, []) }
   | e=RecordHeadExpr { (Record e, []) }
   | e=RecordWithHeadExpr { let (old, l) = e in (RecordWith (old, l), []) }
+  | EXCLM e=AExpr { (AppExp ((Var "_deref", []), e ), []) }
   | LPAREN RPAREN { (Unit, []) }
   | LPAREN e=Expr RPAREN { e }
   | LPAREN e=Expr COLON ty=FunType RPAREN { let (e', l) = e in (e', ty :: l) }
@@ -198,7 +207,8 @@ RecordWithHeadExpr :
 
 
 IfExpr :
-    IF c=Expr THEN t=Expr ELSE e=Expr { (IfExp (c, t, e), []) }
+    IF c=Expr THEN t=NotContinueExpr ELSE e=NotContinueExpr { (IfExp (c, t, e), []) }
+  | IF c=Expr THEN t=NotContinueExpr { (IfExp (c, t, (Unit, [])), []) }
 
 LetExpr :
     LET le=LetAndExpr { let (l, e) = le in (LetExp (l, e), []) }
@@ -252,14 +262,18 @@ MatchExpr :
     MATCH e1=Expr WITH option(BAR) e2=PatternMatchExpr { (MatchExp (e1 , e2), []) }
 
 TupleHeadExpr :
-    e=Expr lst=TupleTailExpr { ConsT (e, lst) }
+    e=OrExpr lst=TupleTailExpr { ConsT (e, lst) }
 
 TupleTailExpr :
-    COMMA e=NotTupleExpr { ConsT (e, EmpT) }
-  | COMMA e=NotTupleExpr lst=TupleTailExpr { ConsT (e, lst) }
+    COMMA e=OrExpr { ConsT (e, EmpT) }
+  | COMMA e=OrExpr lst=TupleTailExpr { ConsT (e, lst) }
 
-RcdAssignExpr :
-    r=Expr DOT x=ID LARROW e=RcdAssignExpr { (AssignExp (r, x, e), []) }
+ContinueExpr :
+    l=AssignExpr SEMI r=Expr { (AppExp ((FunExp (("_", []), r), []), l), []) }
+  | l=IfExpr SEMI r=Expr { (AppExp ((FunExp (("_", []), r), []), l), []) }
+
+
+
 
 
 Pattern :
@@ -336,12 +350,16 @@ MorePatternMatchExpr :
 MorePattern :
     BAR pt=Pattern { pt }
 
+
+
 WithType :
     COLON ty=FunType { ty }
 
 IDt :
     x=ID { (x, []) }
   | LPAREN x=IDt COLON ty=FunType RPAREN { let (x', l) = x in (x', ty :: l) }
+
+
 
 Type :
     option(BAR) v=VariantType l=list(MoreVariantType) { v :: l }
@@ -367,6 +385,8 @@ RecordTailType :
 RecordType :
     x=ID COLON ty=FunType { Field (x, ty, Immutable) }
   | MUTABLE x=ID COLON ty=FunType { Field (x, ty, Mutable) }
+
+
 
 Parameters :
     tv=TYVAR { [tv] }

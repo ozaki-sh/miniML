@@ -248,6 +248,7 @@ let rec get_attached_tyvar_list = function
   | TyTuple TyEmpT -> []
   | TyTuple (TyConsT (ty, tytup)) -> (get_attached_tyvar_list ty) @ (get_attached_tyvar_list (TyTuple tytup))
   | TyUser (_, l) -> List.concat (List.map get_attached_tyvar_list l)
+  | TyUnit -> []
   | _ -> err ("For debug : at get_attached_tyvar_list")
 
 (* attached_tyの型変数とtyの型変数の対応表を作る *)
@@ -906,7 +907,7 @@ and ty_exp tyenv = function
         (match ty2 with
            TyRecord (ty_name, l) ->
             let (param, body_l) = Environment.lookup ty_name !recdefenv in
-            let (arg_ty, mutability) = extract ty_name body_l in
+            let (arg_ty, mutability) = extract name body_l in
             (match mutability with
                Mutable ->
                 let assoc_list = List.combine param l in
