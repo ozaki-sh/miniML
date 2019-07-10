@@ -200,6 +200,7 @@ let rec string_of_ty ty =
         | TyTuple _  -> "(" ^ (body_func ty) ^ ")" ^ " list"
         | _ -> (body_func ty) ^ " list")
     | TyTuple tytup -> string_of_tytuple tytup
+
     | TyUser (x, l) ->
        if List.length l = 0 then x
         else string_of_param l ^ " " ^ x
