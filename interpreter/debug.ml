@@ -102,7 +102,12 @@ and string_of_tyrow = function
     TyInt -> "TyInt"
   | TyBool -> "TyBool"
   | TyString -> "TyString"
-  | TyVar tyvar -> "TyVar " ^ (string_of_int tyvar)
+  | TyVar (tyvar, property) ->
+     let str =
+       match property with
+         Safe -> "Safe"
+       | Out -> "Out" in
+     "TyVar (" ^ (string_of_int tyvar) ^ ", " ^ str ^ ")"
   | TyStringVar tyvar -> "TyStringVar " ^ tyvar
   | TyFun (domty, ranty) -> "TyFun (" ^ (string_of_tyrow domty) ^ ", " ^ (string_of_tyrow ranty) ^ ")"
   | TyList ty -> "TyList " ^ (string_of_tyrow ty)

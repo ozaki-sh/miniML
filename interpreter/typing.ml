@@ -26,7 +26,7 @@ let rec subst_type (subst : subst) t =
     | head :: rest -> subst_one_type (tv, ty) head :: subst_ty_list (tv, ty) rest
   and subst_one_type (tv, ty) t =
     match t with
-      TyVar tv' when tv = tv' -> ty
+      TyVar (tv', _) when tv = tv' -> ty
     | TyFun (domty, ranty) -> TyFun (subst_one_type (tv, ty) domty, subst_one_type (tv, ty) ranty)
     | TyList ty' -> TyList (subst_one_type (tv, ty) ty')
     | TyTuple tytup -> TyTuple (subst_tytuple (tv, ty) tytup)
@@ -42,7 +42,7 @@ let rec subst_type (subst : subst) t =
 let rec eqs_of_subst (s : subst) =
   match s with
     [] -> []
-  | (tyvar, ty) :: rest -> (TyVar tyvar, ty) :: (eqs_of_subst rest)
+  | (tyvar, ty) :: rest -> (TyVar (tyvar, Safe), ty) :: (eqs_of_subst rest)
 
 let rec subst_eqs (s : subst) eqs =
   match eqs with
@@ -66,10 +66,10 @@ let rec unify eqs =
          unify ((List.combine tys1 tys2) @ rest)
       | TyRecord (name1, tys1), TyRecord (name2, tys2) when name1 = name2 && List.length tys1 = List.length tys2->
          unify ((List.combine tys1 tys2) @ rest)
-      | TyVar alpha, _ ->
+      | TyVar (alpha, may_poly), _ -> (* TODO *)
          if MySet.member alpha (freevar_ty ty2) then raise TypeError
          else (alpha, ty2) :: unify (subst_eqs [(alpha, ty2)] rest)
-      | _, TyVar alpha ->
+      | _, TyVar (alpha, may_poly) ->
          if MySet.member alpha (freevar_ty ty1) then raise TypeError
          else (alpha, ty1) :: unify (subst_eqs [(alpha, ty1)] rest)
       | TyNone _, TyNone _ -> unify rest
@@ -159,7 +159,7 @@ let closure ty (tyenv : tyenv) subst =
   let fv_tyenv =
     MySet.bigunion
       (MySet.map
-         (fun id -> freevar_ty (subst_type subst (TyVar id)))
+         (fun id -> freevar_ty (subst_type subst (TyVar (id, Safe))))
          fv_tyenv') in
   let ids = MySet.diff (freevar_ty ty) fv_tyenv in
   TyScheme (MySet.to_list ids, ty)
@@ -290,7 +290,7 @@ let rec transform exp_with_ty stv_to_itv_list =
       TyInt -> TyInt
     | TyBool -> TyBool
     | TyString -> TyString
-    | TyStringVar tyvar -> TyVar (List.assoc tyvar stv_to_itv_list)
+    | TyStringVar tyvar -> TyVar ((List.assoc tyvar stv_to_itv_list), Safe)
     | TyFun (domty, ranty) -> TyFun (transform_att_ty domty, transform_att_ty ranty)
     | TyList ty -> TyList (transform_att_ty ty)
     | TyTuple tytup -> TyTuple (transform_att_tytuple tytup)
@@ -367,7 +367,7 @@ let rec transform_decl decl stv_to_itv_list =
       TyInt -> TyInt
     | TyBool -> TyBool
     | TyString -> TyString
-    | TyStringVar tyvar -> TyVar (List.assoc tyvar stv_to_itv_list)
+    | TyStringVar tyvar -> TyVar ((List.assoc tyvar stv_to_itv_list), Safe)
     | TyFun (domty, ranty) -> TyFun (transform_att_ty domty, transform_att_ty ranty)
     | TyList ty -> TyList (transform_att_ty ty)
     | TyTuple tytup -> TyTuple (transform_att_tytuple tytup)
@@ -399,7 +399,7 @@ let replace stv_to_itv_list ty =
       TyInt -> TyInt
     | TyBool -> TyBool
     | TyString -> TyString
-    | TyStringVar tyvar -> TyVar (List.assoc tyvar stv_to_itv_list)
+    | TyStringVar tyvar -> TyVar ((List.assoc tyvar stv_to_itv_list), Safe)
     | TyFun (domty, ranty) -> TyFun (body_func domty, body_func ranty)
     | TyList ty' -> TyList (body_func ty')
     | TyTuple tytup -> TyTuple (case_tytuple tytup)
@@ -455,7 +455,7 @@ let ty_prim op ty1 ty2 = match op with
   | Eq -> ([(ty1, ty2)], TyBool)
   | Cons ->
      (match ty1, ty2 with
-        TyList (TyVar alpha), TyList (TyVar beta) when alpha = beta -> ([], TyList ty2)
+        TyList (TyVar (alpha, _)), TyList (TyVar (beta, _)) when alpha = beta -> ([], TyList ty2)
       | _, TyList _
       | _, TyVar _ -> ([(TyList ty1, ty2)], TyList ty1)
       | _ -> err ("right side must be list: ::"))
@@ -508,7 +508,7 @@ let rec filter_satisfied candidates name_l =
 let rec make_name_beta_l = function
     [] -> []
   | name :: rest ->
-     let beta = fresh_tyvar () in
+     let beta = fresh_tyvar () in (* HHHHHEEEEERRRRREEEE *)
      (name, beta) :: make_name_beta_l rest
 
 let rec make_this_ty_assoc_list = function
@@ -528,15 +528,15 @@ let rec make_subst_and_rel tyenv alpha this_ty_l this_ty_assoc_list name_beta_l 
        let stv_to_itv_list = List.assoc this_ty_name this_ty_assoc_list in
        let replaced_arg_ty = replace stv_to_itv_list arg_ty in
        let (_, tyvars) = List.split stv_to_itv_list in
-       let tyVars = List.map (fun tyvar -> TyVar tyvar) tyvars in
+       let tyVars = List.map (fun tyvar -> TyVar (tyvar, Safe)) tyvars in
        (replaced_arg_ty, TyRecord (this_ty_name, tyVars)) in
      let l = List.map f (List.filter (fun (_, this_ty) -> List.mem this_ty this_ty_l) (Rev_environment.lookup name !rev_defenv)) in
      let (field_ty_l, _) = List.split l in
      let s'' =
        if List.length l = 1 then
-         unify [(TyVar beta, List.hd field_ty_l); (TyVar beta, ty)]
+         unify [(TyVar (beta, Safe), List.hd field_ty_l); (TyVar (beta, Safe), ty)]
        else
-         unify [(TyVar beta, TySet (beta, MySet.from_list field_ty_l)); (TyVar beta, ty)] in
+         unify [(TyVar (beta, Safe), TySet (beta, MySet.from_list field_ty_l)); (TyVar (beta, Safe), ty)] in
      let rel'' = make_dependent_relation alpha beta l in
      (s @ s'' @ s', rel @ rel'' @ rel)
 
@@ -545,7 +545,7 @@ and ty_exp tyenv = function
     (Var x, att_ty) ->
      (try
         let TyScheme (vars, ty) = Environment.lookup x tyenv in
-        let s1 = List.map (fun id -> (id, TyVar (fresh_tyvar ()))) vars in
+        let s1 = List.map (fun id -> (id, TyVar ((fresh_tyvar (), Safe)))) vars in
         let ty' = subst_type s1 ty in
         let eqs = make_eqs_about_att_ty ty' att_ty in
         let s2 = unify eqs in
@@ -568,7 +568,7 @@ and ty_exp tyenv = function
         let f (arg_ty, this_ty_name) =
           let (params, _) = Environment.lookup this_ty_name !vardefenv in
           let tyvars = List.map (fun _ -> fresh_tyvar ()) params in
-          let tyVars = List.map (fun tyvar -> TyVar tyvar) tyvars in
+          let tyVars = List.map (fun tyvar -> TyVar (tyvar, Safe)) tyvars in
           let replaced_arg_ty = replace (List.combine params tyvars) arg_ty in
           (replaced_arg_ty, TyVariant (this_ty_name, tyVars)) in
         let l = List.map f (Rev_environment.lookup name !rev_defenv) in
@@ -583,9 +583,9 @@ and ty_exp tyenv = function
         let arg_ty_set = MySet.from_list arg_ty_l in
         let arg_s =
           if MySet.length arg_ty_set = 1 then
-            unify [(TyVar beta, List.hd arg_ty_l); (TyVar beta, arg_ty)]
+            unify [(TyVar (beta, Safe), List.hd arg_ty_l); (TyVar (beta, Safe), arg_ty)]
           else
-            unify [(TyVar beta, TySet (beta, arg_ty_set)); (TyVar beta, arg_ty)] in
+            unify [(TyVar (beta, Safe), TySet (beta, arg_ty_set)); (TyVar (beta, Safe), arg_ty)] in
         let this_ty_set = MySet.from_list this_ty_l in
         let this_s =
           if MySet.length this_ty_set = 1 then
@@ -594,9 +594,9 @@ and ty_exp tyenv = function
             [(alpha, TySet (alpha, this_ty_set))] in
         let arg_eqs = eqs_of_subst (squeeze_subst arg_s) in
         let this_eqs = eqs_of_subst this_s in
-        let eqs = (eqs_of_subst s1) @ arg_eqs @ this_eqs @ make_eqs_about_att_ty (TyVar alpha) att_ty in
+        let eqs = (eqs_of_subst s1) @ arg_eqs @ this_eqs @ make_eqs_about_att_ty (TyVar (alpha, Safe)) att_ty in
         let s2 = squeeze_subst (unify eqs) in
-        (s2, subst_type s2 (TyVar alpha), rel @ arg_rel)
+        (s2, subst_type s2 (TyVar (alpha, Safe)), rel @ arg_rel)
       with
         Rev_environment.Not_bound -> err ("constructor not bound: " ^ name))
   | (Record l, att_ty) ->
@@ -611,7 +611,7 @@ and ty_exp tyenv = function
        let f this_ty_name =
          let stv_to_itv_list = List.assoc this_ty_name this_ty_assoc_list in
          let (_, tyvars) = List.split stv_to_itv_list in
-         let tyVars = List.map (fun tyvar -> TyVar tyvar) tyvars in
+         let tyVars = List.map (fun tyvar -> TyVar (tyvar, Safe)) tyvars in
          TyRecord (this_ty_name, tyVars) in
        let this_ty_set = MySet.from_list (List.map f this_ty_l) in
        let (field_s, rel) = make_subst_and_rel tyenv alpha this_ty_l this_ty_assoc_list name_beta_l l in
@@ -622,9 +622,9 @@ and ty_exp tyenv = function
            [(alpha, TySet (alpha, this_ty_set))] in
        let field_eqs = eqs_of_subst (squeeze_subst field_s) in
        let this_eqs = eqs_of_subst this_s in
-       let eqs = field_eqs @ this_eqs @ make_eqs_about_att_ty (TyVar alpha) att_ty in
+       let eqs = field_eqs @ this_eqs @ make_eqs_about_att_ty (TyVar (alpha, Safe)) att_ty in
        let s = squeeze_subst (unify eqs) in
-       (s, subst_type s (TyVar alpha), rel)
+       (s, subst_type s (TyVar (alpha, Safe)), rel)
   | (RecordWith (exp, l), att_ty) ->
      let (s1, ty, rel1) = ty_exp tyenv exp in
      let (candidates, name_l) = get_candidates true MySet.empty [] l in
@@ -634,20 +634,20 @@ and ty_exp tyenv = function
      let f this_ty_name =
        let stv_to_itv_list = List.assoc this_ty_name this_ty_assoc_list in
        let (_, tyvars) = List.split stv_to_itv_list in
-       let tyVars = List.map (fun tyvar -> TyVar tyvar) tyvars in
+       let tyVars = List.map (fun tyvar -> TyVar (tyvar, Safe)) tyvars in
        TyRecord (this_ty_name, tyVars) in
      let this_ty_set = MySet.from_list (List.map f candidates) in
      let (field_s, rel2) = make_subst_and_rel tyenv alpha candidates this_ty_assoc_list name_beta_l l in
      let this_s =
        if MySet.length this_ty_set = 1 then
-         unify [(TyVar alpha, (List.hd (MySet.to_list this_ty_set))); (TyVar alpha, ty)]
+         unify [(TyVar (alpha, Safe), (List.hd (MySet.to_list this_ty_set))); (TyVar (alpha, Safe), ty)]
        else
-         unify [(TyVar alpha, TySet (alpha, this_ty_set)); (TyVar alpha, ty)] in
+         unify [(TyVar (alpha, Safe), TySet (alpha, this_ty_set)); (TyVar (alpha, Safe), ty)] in
      let field_eqs = eqs_of_subst (squeeze_subst field_s) in
      let this_eqs = eqs_of_subst (squeeze_subst this_s) in
-     let eqs = (eqs_of_subst s1) @ field_eqs @ this_eqs @ make_eqs_about_att_ty (TyVar alpha) att_ty in
+     let eqs = (eqs_of_subst s1) @ field_eqs @ this_eqs @ make_eqs_about_att_ty (TyVar (alpha, Safe)) att_ty in
      let s2 = squeeze_subst (unify eqs) in
-     (s2, subst_type s2 (TyVar alpha), rel1 @ rel2)
+     (s2, subst_type s2 (TyVar (alpha, Safe)), rel1 @ rel2)
   | (BinOp (op, exp1, exp2), att_ty) ->
      let (s1, ty1, rel1) = ty_exp tyenv exp1 in
      let (s2, ty2, rel2) = ty_exp tyenv exp2 in
@@ -693,7 +693,7 @@ and ty_exp tyenv = function
      in
      ty_let_list l tyenv [] []
   | (FunExp ((id, att_ty'), exp), att_ty) ->
-     let domty = TyVar (fresh_tyvar ()) in
+     let domty = TyVar (fresh_tyvar (), Out) in
      let (s1, ranty, rel) = ty_exp (Environment.extend id (TyScheme ([], domty)) tyenv) exp in
      let ty = TyFun (subst_type s1 domty, ranty) in
      let eqs = (eqs_of_subst s1) @ (make_eqs_about_att_ty (subst_type s1 domty) att_ty') @ (make_eqs_about_att_ty ty att_ty) in
@@ -708,8 +708,8 @@ and ty_exp tyenv = function
          let s3 = squeeze_subst (unify eqs) in
          (s3, subst_type s3 ranty, rel1 @ rel2)
       | TyVar _  ->
-         let domty = TyVar (fresh_tyvar ()) in
-         let ranty = TyVar (fresh_tyvar ()) in
+         let domty = TyVar (fresh_tyvar (), Out) in
+         let ranty = TyVar (fresh_tyvar (), Safe) in
          let eqs = (eqs_of_subst s1) @ (eqs_of_subst s2) @ [(ty1, TyFun (domty, ranty)); (domty, ty2)]
                    @ (make_eqs_about_att_ty ranty att_ty) in
          let s3 = squeeze_subst (unify eqs) in
@@ -752,8 +752,8 @@ and ty_exp tyenv = function
           if List.mem_assoc id id_l then
             err ("one variable is bound several times in this expression")
           else
-            let domty = TyVar (fresh_tyvar ()) in
-            let ranty = TyVar (fresh_tyvar ()) in
+            let domty = TyVar (fresh_tyvar (), Out) in
+            let ranty = TyVar (fresh_tyvar (), Safe) in
             let newtyenv = Environment.extend id (TyScheme ([], (TyFun (domty, ranty)))) tyenv' in
             main_loop rest newtyenv ((exp, domty, ranty) :: exp_dom_ran_l) (typed_id :: id_l)
      in
@@ -761,7 +761,7 @@ and ty_exp tyenv = function
   | (ListExp l, att_ty) ->
      (match l with
         Emp ->
-         let ty = TyList (TyVar (fresh_tyvar ())) in
+         let ty = TyList (TyVar (fresh_tyvar (), Safe)) in
          let eqs = make_eqs_about_att_ty ty att_ty in
          let s = squeeze_subst (unify eqs) in
          (s, subst_type s ty, [])
@@ -810,7 +810,7 @@ and ty_exp tyenv = function
        match id_l with
          [] -> tyenv
        | head :: rest ->
-          Environment.extend head (TyScheme ([], (TyVar (fresh_tyvar ())))) (bind_id rest)
+          Environment.extend head (TyScheme ([], (TyVar (fresh_tyvar (), Safe)))) (bind_id rest)
      and eval_ty = function
          [] -> ([], [], [], [], [], [])
        | (pattern, body) :: rest ->
@@ -861,7 +861,7 @@ and ty_exp tyenv = function
       let f this_ty_name =
         let stv_to_itv_list = List.assoc this_ty_name this_ty_assoc_list in
         let (_, tyvars) = List.split stv_to_itv_list in
-        let tyVars = List.map (fun tyvar -> TyVar tyvar) tyvars in
+        let tyVars = List.map (fun tyvar -> TyVar (tyvar, Safe)) tyvars in
         TyRecord (this_ty_name, tyVars) in
      let this_ty_set = MySet.from_list (List.map f candidates) in
      let (field_s, rel) = make_subst_and_rel tyenv alpha candidates this_ty_assoc_list name_beta_l l in
@@ -872,9 +872,9 @@ and ty_exp tyenv = function
          [(alpha, TySet (alpha, this_ty_set))] in
      let field_eqs = eqs_of_subst (squeeze_subst field_s) in
      let this_eqs = eqs_of_subst this_s in
-     let eqs = field_eqs @ this_eqs @ make_eqs_about_att_ty (TyVar alpha) att_ty in
+     let eqs = field_eqs @ this_eqs @ make_eqs_about_att_ty (TyVar (alpha, Safe)) att_ty in
      let s = squeeze_subst (unify eqs) in
-     (s, subst_type s (TyVar alpha), rel)
+     (s, subst_type s (TyVar (alpha, Safe)), rel)
   | (AssignExp (exp1, name, exp2), att_ty) ->
      let rec extract x = function
          [] -> err ("For debug: at extract")
@@ -891,19 +891,19 @@ and ty_exp tyenv = function
         let f this_ty_name =
           let stv_to_itv_list = List.assoc this_ty_name ty_assoc_list in
           let (_, tyvars) = List.split stv_to_itv_list in
-          let tyVars = List.map (fun tyvar -> TyVar tyvar) tyvars in
+          let tyVars = List.map (fun tyvar -> TyVar (tyvar, Safe)) tyvars in
           TyRecord (this_ty_name, tyVars) in
         let ty_set = MySet.from_list (List.map f candidates) in
         let s2 =
           if MySet.length ty_set = 1 then
-            unify [(TyVar alpha, (List.hd (MySet.to_list ty_set))); (TyVar alpha, ty1)]
+            unify [(TyVar (alpha, Safe), (List.hd (MySet.to_list ty_set))); (TyVar (alpha, Safe), ty1)]
           else
-            unify [(TyVar alpha, TySet (alpha, ty_set)); (TyVar alpha, ty1)] in
+            unify [(TyVar (alpha, Safe), TySet (alpha, ty_set)); (TyVar (alpha, Safe), ty1)] in
         let eqs1 = (eqs_of_subst s1) @ (eqs_of_subst (squeeze_subst s2)) in
         let s3 = squeeze_subst (unify eqs1) in
         let s4 = finalize_subst s3 in
         let s5 = unify (eqs_of_subst (s4 @ reflect_dependency rel1 s4)) in
-        let ty2 = subst_type s5 (TyVar alpha) in
+        let ty2 = subst_type s5 (TyVar (alpha, Safe)) in
         (match ty2 with
            TyRecord (ty_name, l) ->
             let (param, body_l) = Environment.lookup ty_name !recdefenv in
@@ -925,7 +925,7 @@ and ty_exp tyenv = function
      let s = squeeze_subst (unify eqs) in
      (s, TyUnit, [])
   | (Wildcard, att_ty) ->
-     let ty = TyVar (fresh_tyvar ()) in
+     let ty = TyVar (fresh_tyvar (), Safe) in
      let eqs = make_eqs_about_att_ty ty att_ty in
      let s = squeeze_subst (unify eqs) in
      (s, subst_type s ty, [])
@@ -1011,8 +1011,8 @@ let ty_decl tyenv defenv' vardefenv' recdefenv' rev_defenv' decl =
                  if List.mem_assoc id id_l then
                    err ("one variable is bound several times in this declaration")
                  else
-                   let domty = TyVar (fresh_tyvar ()) in
-                   let ranty = TyVar (fresh_tyvar ()) in
+                   let domty = TyVar (fresh_tyvar (), Out) in
+                   let ranty = TyVar (fresh_tyvar (), Safe) in
                    let newtyenv = Environment.extend id (TyScheme ([], (TyFun (domty, ranty)))) and_tyenv in
                    make_andrecdecl_ty_list inner_rest newtyenv ((exp, domty, ranty) :: exp_dom_ran_l) (typed_id :: id_l))
            in

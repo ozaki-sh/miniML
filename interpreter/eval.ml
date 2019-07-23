@@ -68,7 +68,7 @@ let rec assocList_of_recordval = function
     EmpRV -> []
   | ConsRV ((name, exval), rest) -> (name, exval) :: assocList_of_recordval rest
 
-let replace param_ty_assoc_list ty =
+let replace_param param_ty_assoc_list ty =
   let rec case_tytuple = function
       TyEmpT -> TyEmpT
     | TyConsT (ty', tytup') -> TyConsT (body_func ty', case_tytuple tytup')
@@ -79,7 +79,7 @@ let replace param_ty_assoc_list ty =
       TyInt -> TyInt
     | TyBool -> TyBool
     | TyString -> TyString
-    | TyVar tyvar -> TyVar tyvar
+    | TyVar (tyvar, may_poly) -> TyVar (tyvar, may_poly)
     | TyStringVar tyvar -> List.assoc tyvar param_ty_assoc_list
     | TyFun (domty, ranty) -> TyFun (body_func domty, body_func ranty)
     | TyList ty' -> TyList (body_func ty')
@@ -126,7 +126,7 @@ and string_of_constr ty defenv store name valueop =
      let (param, body_l) = Environment.lookup id defenv in
      let more_body_l = List.map (fun x -> match x with Constructor (n, t) -> (n, t) | Field (n, t, _) -> (n, t) (* nonsense *)) body_l in
      let param_ty_assoc_list = List.combine param tys in
-     let ty' = replace param_ty_assoc_list (List.assoc name more_body_l) in
+     let ty' = replace_param param_ty_assoc_list (List.assoc name more_body_l) in
      (match v with
         ConstrV (_, Some _) -> name ^ " (" ^ (string_of_exval ty' defenv store v) ^ ")"
       | _ -> name ^ " " ^ (string_of_exval ty' defenv store v))
@@ -140,7 +140,7 @@ and string_of_record ty defenv store l =
     match body_l with
       [] -> "}"
     | Field (name, ty', _) :: rest ->
-       "; " ^ name ^ " = " ^ (string_of_exval (replace param_ty_assoc_list ty') defenv store (List.assoc name recordval_assoc_list)) ^ (inner_loop rest)
+       "; " ^ name ^ " = " ^ (string_of_exval (replace_param param_ty_assoc_list ty') defenv store (List.assoc name recordval_assoc_list)) ^ (inner_loop rest)
     | _ -> err ("For debug: at string_of_record")
   in
   let str = inner_loop body_l in

@@ -11,13 +11,15 @@ type binLogicOp = And | Or
 
 type tyvar = int
 
+type property = Safe | Out
+
 type name = string
 
 type ty =
     TyInt
   | TyBool
   | TyString
-  | TyVar of tyvar
+  | TyVar of tyvar * property
   | TyStringVar of string
   | TyFun of ty * ty
   | TyList of ty
@@ -138,7 +140,7 @@ let make_tyvar_string_list ty =
       TyInt
     | TyBool
     | TyString -> ts_list
-    | TyVar tyvar ->
+    | TyVar (tyvar, _) ->
        if List.mem_assoc tyvar ts_list then ts_list
        else (counter := num + 1; (tyvar, string_of_num num) :: ts_list)
     | TyStringVar tyvar -> ts_list (* これは型宣言の時しか呼ばれない *)
@@ -155,6 +157,13 @@ let make_tyvar_string_list ty =
     | _ -> err ("For debug: at make_tyvar_string_list")
   in
   body_func ty []
+
+let weak_counter =
+  let counter = ref 0 in
+  let body () =
+    let v = !counter in
+    counter := v + 1; v
+  in body
 
 let rec string_of_ty ty =
   let tyvar_string_list = make_tyvar_string_list ty in (* これを持ちまわるのが面倒だったのでbody_funcを作った *)
@@ -187,7 +196,7 @@ let rec string_of_ty ty =
       TyInt -> "int"
     | TyBool -> "bool"
     | TyString -> "string"
-    | TyVar tyvar -> List.assoc tyvar tyvar_string_list
+    | TyVar (tyvar, _) -> List.assoc tyvar tyvar_string_list
     | TyStringVar tyvar -> tyvar (* これは型宣言の時しか呼ばれない *)
     | TyFun (domty, ranty) ->
        (match domty with
@@ -251,7 +260,7 @@ let rec freevar_ty ty =
     TyInt
   | TyBool
   | TyString -> MySet.empty
-  | TyVar tyvar -> MySet.singleton tyvar
+  | TyVar (tyvar, _) -> MySet.singleton tyvar
   | TyFun (domty, ranty) -> MySet.union (freevar_ty domty) (freevar_ty ranty)
   | TyList ty -> freevar_ty ty
   | TyTuple tytup -> freevar_tytuple tytup
@@ -306,3 +315,39 @@ let string_of_param_decl param =
   else
     let str = inner_loop param in
     "(" ^ String.sub str 2 (String.length str - 2) ^ " "
+
+
+let rec is_value exp =
+  let rec case_list = function
+      Emp -> true
+    | Cons ((head, _), rest) -> is_value head && case_list rest
+  and case_tuple = function
+      EmpT -> true
+    | ConsT ((head, _), rest) -> is_value head && case_tuple rest
+  in
+  match exp with
+    Var _ -> true
+  | ILit _ -> true
+  | BLit _ -> true
+  | SLit _ -> true
+  | Constr (_, expop) ->
+     (match expop with
+        None -> true
+      | Some (exp', _) -> is_value exp')
+  | Record _ -> false
+  | RecordWith _ -> false
+  | BinOp _ -> false
+  | BinLogicOp _ -> false
+  | IfExp _ -> false
+  | LetExp _ -> false
+  | FunExp _ -> true
+  | DFunExp _ -> true
+  | AppExp _ -> false
+  | LetRecExp _ -> false
+  | ListExp l -> case_list l
+  | MatchExp _ -> false
+  | TupleExp l -> case_tuple l
+  | RecordPattern _ -> false
+  | AssignExp _ -> false
+  | Unit -> true
+  | Wildcard -> true
