@@ -102,12 +102,7 @@ and string_of_tyrow = function
     TyInt -> "TyInt"
   | TyBool -> "TyBool"
   | TyString -> "TyString"
-  | TyVar (tyvar, property) ->
-     let str =
-       match property with
-         Safe -> "Safe"
-       | Out -> "Out" in
-     "TyVar (" ^ (string_of_int tyvar) ^ ", " ^ str ^ ")"
+  | TyVar tyvar -> "TyVar " ^ (string_of_int tyvar)
   | TyStringVar tyvar -> "TyStringVar " ^ tyvar
   | TyFun (domty, ranty) -> "TyFun (" ^ (string_of_tyrow domty) ^ ", " ^ (string_of_tyrow ranty) ^ ")"
   | TyList ty -> "TyList " ^ (string_of_tyrow ty)
@@ -156,7 +151,7 @@ let string_of_decl = function
          x ^ (List.fold_left
                 (fun s t -> s ^ t ^ "\n")
                 ""
-                (List.map (fun (id, param, tydecl) -> id ^ " <-def-> " ^ "[" ^ string_of_param param ^ " " ^  string_of_defs tydecl) y)) ^ "\n")
+                (List.map (fun (id, param, tydecl) -> id ^ " <-def-> " ^ "[" ^ string_of_param param ^ "] " ^  string_of_defs tydecl) y)) ^ "\n")
        ""
        l
 

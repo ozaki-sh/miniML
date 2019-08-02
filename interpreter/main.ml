@@ -41,7 +41,7 @@ let rec read_eval_print env tyenv defenv rev_defenv store =
        in
        outer_display l
     | _ ->
-       let (vardefenv, recdefenv) = Environment.partition (fun (_, body_l) -> match List.hd body_l with Constructor _ -> true | _ -> false) defenv in
+       let (vardefenv, recdefenv) = Environment.partition (fun (_, _, body_l) -> match List.hd body_l with Constructor _ -> true | _ -> false) defenv in
        let tys = ty_decl tyenv defenv vardefenv recdefenv rev_defenv decl in
        let decls = eval_decl env store decl in
        let rec list_process exp_l ty_l env tyenv store res_l =
@@ -145,7 +145,7 @@ let read_eval_print_from_file env tyenv defenv rev_defenv store filename =
               in
               outer_display l
             | _ ->
-               let (vardefenv, recdefenv) = Environment.partition (fun (_, body_l) -> match List.hd body_l with Constructor _ -> true | _ -> false) defenv in
+               let (vardefenv, recdefenv) = Environment.partition (fun (_, _, body_l) -> match List.hd body_l with Constructor _ -> true | _ -> false) defenv in
                let tys = ty_decl tyenv defenv vardefenv recdefenv rev_defenv decl in
                let decls = eval_decl env store decl in
                let rec list_process exp_l ty_l env tyenv store res_l =

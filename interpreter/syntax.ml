@@ -19,7 +19,7 @@ type ty =
     TyInt
   | TyBool
   | TyString
-  | TyVar of tyvar * property
+  | TyVar of tyvar
   | TyStringVar of string
   | TyFun of ty * ty
   | TyList of ty
@@ -140,7 +140,7 @@ let make_tyvar_string_list ty =
       TyInt
     | TyBool
     | TyString -> ts_list
-    | TyVar (tyvar, _) ->
+    | TyVar tyvar ->
        if List.mem_assoc tyvar ts_list then ts_list
        else (counter := num + 1; (tyvar, string_of_num num) :: ts_list)
     | TyStringVar tyvar -> ts_list (* これは型宣言の時しか呼ばれない *)
@@ -196,7 +196,7 @@ let rec string_of_ty ty =
       TyInt -> "int"
     | TyBool -> "bool"
     | TyString -> "string"
-    | TyVar (tyvar, _) -> List.assoc tyvar tyvar_string_list
+    | TyVar tyvar -> List.assoc tyvar tyvar_string_list
     | TyStringVar tyvar -> tyvar (* これは型宣言の時しか呼ばれない *)
     | TyFun (domty, ranty) ->
        (match domty with
@@ -260,7 +260,7 @@ let rec freevar_ty ty =
     TyInt
   | TyBool
   | TyString -> MySet.empty
-  | TyVar (tyvar, _) -> MySet.singleton tyvar
+  | TyVar tyvar -> MySet.singleton tyvar
   | TyFun (domty, ranty) -> MySet.union (freevar_ty domty) (freevar_ty ranty)
   | TyList ty -> freevar_ty ty
   | TyTuple tytup -> freevar_tytuple tytup

@@ -11,7 +11,7 @@ let option_body =
   let body =
     [Constructor ("None", TyNone "None");
      Constructor ("Some", TyStringVar "'a")] in
-  (param, body)
+  (param, [Safe], body)
 
 let ref_rec = "-2#ref"
 
@@ -19,7 +19,7 @@ let ref_rec_body =
   let param = ["'a"] in
   let body =
     [Field ("contents", TyStringVar "'a", Mutable)] in
-  (param, body)
+  (param, [Out], body)
 
 let ref_fun = "ref"
 
@@ -27,7 +27,7 @@ let ref_fun_body =
   Record (ConsR (("contents", (Var "x", [])), EmpR))
 
 let ref_fun_type =
-  TyScheme ([alpha], TyFun (TyVar (alpha, Safe), TyRecord (ref_rec, [TyVar (alpha, Safe)])))
+  TyScheme ([alpha], TyFun (TyVar alpha, TyRecord (ref_rec, [TyVar alpha])))
 
 let assign = "_assign"
 
@@ -35,7 +35,7 @@ let assign_body =
   FunExp (("y", []), (AssignExp ((Var "x", []), "contents", (Var "y", [])), []))
 
 let assign_type =
-  TyScheme ([alpha], TyFun (TyRecord (ref_rec, [TyVar (alpha, Safe)]), TyFun (TyVar (alpha, Safe), TyUnit)))
+  TyScheme ([alpha], TyFun (TyRecord (ref_rec, [TyVar alpha]), TyFun (TyVar alpha, TyUnit)))
 
 let deref = "_deref"
 
@@ -43,7 +43,7 @@ let deref_body =
   MatchExp ((Var "x", []), [((RecordPattern (ConsR (("contents", (Var "_a", [])), EmpR)), []), (Var "_a", []))])
 
 let deref_type =
-  TyScheme ([alpha], TyFun (TyRecord (ref_rec, [TyVar (alpha, Safe)]), TyVar (alpha, Safe)))
+  TyScheme ([alpha], TyFun (TyRecord (ref_rec, [TyVar alpha]), TyVar alpha))
 
 let env_l =
   [(ref_fun, ProcV ("x", ref_fun_body, ref Environment.empty));

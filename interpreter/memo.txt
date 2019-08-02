@@ -73,3 +73,9 @@ type 'a a = {x : 'a -> 'a}
 let r = {x = fun x -> x}
 
 型変数を集める
+
+[(id, para, body_l);
+ (id, para, body_l);
+ @
+ @
+ (id, para, body_l)]

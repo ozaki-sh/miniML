@@ -79,7 +79,7 @@ let replace_param param_ty_assoc_list ty =
       TyInt -> TyInt
     | TyBool -> TyBool
     | TyString -> TyString
-    | TyVar (tyvar, may_poly) -> TyVar (tyvar, may_poly)
+    | TyVar tyvar -> TyVar tyvar
     | TyStringVar tyvar -> List.assoc tyvar param_ty_assoc_list
     | TyFun (domty, ranty) -> TyFun (body_func domty, body_func ranty)
     | TyList ty' -> TyList (body_func ty')
@@ -123,7 +123,7 @@ and string_of_constr ty defenv store name valueop =
     None -> name
   | Some v ->
      let (id, tys) = match ty with TyVariant (x, l) -> (x, l) | _ -> ("", []) (* nonsense *) in
-     let (param, body_l) = Environment.lookup id defenv in
+     let (param, _, body_l) = Environment.lookup id defenv in
      let more_body_l = List.map (fun x -> match x with Constructor (n, t) -> (n, t) | Field (n, t, _) -> (n, t) (* nonsense *)) body_l in
      let param_ty_assoc_list = List.combine param tys in
      let ty' = replace_param param_ty_assoc_list (List.assoc name more_body_l) in
@@ -133,7 +133,7 @@ and string_of_constr ty defenv store name valueop =
 
 and string_of_record ty defenv store l =
   let (id, tys) = match ty with TyRecord (x, l) -> (x, l) | _ -> ("", []) (* nonsense *) in
-  let (param, body_l) = Environment.lookup id defenv in
+  let (param, _, body_l) = Environment.lookup id defenv in
   let param_ty_assoc_list = List.combine param tys in
   let recordval_assoc_list = assocList_of_recordval l in
   let rec inner_loop body_l =
