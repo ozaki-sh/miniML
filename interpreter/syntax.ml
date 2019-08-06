@@ -21,6 +21,7 @@ type ty =
   | TyString
   | TyVar of tyvar
   | TyStringVar of string
+  | WeakTyVar of tyvar
   | TyFun of ty * ty
   | TyList of ty
   | TyTuple of tytuple
@@ -144,6 +145,7 @@ let make_tyvar_string_list ty =
        if List.mem_assoc tyvar ts_list then ts_list
        else (counter := num + 1; (tyvar, string_of_num num) :: ts_list)
     | TyStringVar tyvar -> ts_list (* これは型宣言の時しか呼ばれない *)
+    | WeakTyVar tyvar -> ts_list
     | TyFun (domty, ranty) ->
        let domty_ts_list = body_func domty ts_list in
        let ranty_ts_list = body_func ranty domty_ts_list in
@@ -159,7 +161,7 @@ let make_tyvar_string_list ty =
   body_func ty []
 
 let weak_counter =
-  let counter = ref 0 in
+  let counter = ref 1 in
   let body () =
     let v = !counter in
     counter := v + 1; v
@@ -198,6 +200,7 @@ let rec string_of_ty ty =
     | TyString -> "string"
     | TyVar tyvar -> List.assoc tyvar tyvar_string_list
     | TyStringVar tyvar -> tyvar (* これは型宣言の時しか呼ばれない *)
+    | WeakTyVar tyvar -> "'_weak" ^ string_of_int tyvar
     | TyFun (domty, ranty) ->
        (match domty with
           TyFun _
@@ -261,6 +264,7 @@ let rec freevar_ty ty =
   | TyBool
   | TyString -> MySet.empty
   | TyVar tyvar -> MySet.singleton tyvar
+  | WeakTyVar tyvar -> MySet.empty
   | TyFun (domty, ranty) -> MySet.union (freevar_ty domty) (freevar_ty ranty)
   | TyList ty -> freevar_ty ty
   | TyTuple tytup -> freevar_tytuple tytup

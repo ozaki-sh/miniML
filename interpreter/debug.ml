@@ -104,6 +104,7 @@ and string_of_tyrow = function
   | TyString -> "TyString"
   | TyVar tyvar -> "TyVar " ^ (string_of_int tyvar)
   | TyStringVar tyvar -> "TyStringVar " ^ tyvar
+  | WeakTyVar tyvar -> "WeakTyVar " ^ string_of_int tyvar
   | TyFun (domty, ranty) -> "TyFun (" ^ (string_of_tyrow domty) ^ ", " ^ (string_of_tyrow ranty) ^ ")"
   | TyList ty -> "TyList " ^ (string_of_tyrow ty)
   | TyTuple tytup -> "TyTuple (" ^ string_of_tytuple tytup ^ ")"

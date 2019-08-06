@@ -139,7 +139,7 @@ IF Expr THEN NotContinueExpr ELSE NotContinueExpr // lookahead token appears
 ** Token involved: SEMI
 ** This state is reached from toplevel after reading:
 
-LBOXBRA AssignExpr 
+LCLYBRA ID EQ AssignExpr 
 
 ** The derivations that appear below have the following common factor:
 ** (The question mark symbol (?) represents the spot where the derivations begin to differ.)
@@ -149,28 +149,30 @@ Expr SEMISEMI
 AssignExpr 
 ProjExpr DOT ID LARROW AssignExpr 
 AExpr 
-ListHeadExpr 
+RecordHeadExpr 
 (?)
 
 ** In state 201, looking ahead at SEMI, shifting is permitted
 ** because of the following sub-derivation:
 
-LBOXBRA Expr ListTailExpr 
-        ContinueExpr 
-        AssignExpr . SEMI Expr 
+LCLYBRA RecordExpr RecordTailExpr 
+        ID EQ Expr 
+              ContinueExpr 
+              AssignExpr . SEMI Expr 
 
 ** In state 201, looking ahead at SEMI, reducing production
 ** Expr -> AssignExpr 
 ** is permitted because of the following sub-derivation:
 
-LBOXBRA Expr ListTailExpr // lookahead token appears because ListTailExpr can begin with SEMI
-        AssignExpr . 
+LCLYBRA RecordExpr RecordTailExpr // lookahead token appears because RecordTailExpr can begin with SEMI
+        ID EQ Expr // lookahead token is inherited
+              AssignExpr . 
 
 ** Conflict (shift/reduce) in state 195.
 ** Token involved: SEMI
 ** This state is reached from toplevel after reading:
 
-LBOXBRA IfExpr 
+LCLYBRA ID EQ IfExpr 
 
 ** The derivations that appear below have the following common factor:
 ** (The question mark symbol (?) represents the spot where the derivations begin to differ.)
@@ -180,22 +182,24 @@ Expr SEMISEMI
 AssignExpr 
 ProjExpr DOT ID LARROW AssignExpr 
 AExpr 
-ListHeadExpr 
+RecordHeadExpr 
 (?)
 
 ** In state 195, looking ahead at SEMI, shifting is permitted
 ** because of the following sub-derivation:
 
-LBOXBRA Expr ListTailExpr 
-        ContinueExpr 
-        IfExpr . SEMI Expr 
+LCLYBRA RecordExpr RecordTailExpr 
+        ID EQ Expr 
+              ContinueExpr 
+              IfExpr . SEMI Expr 
 
 ** In state 195, looking ahead at SEMI, reducing production
 ** Expr -> IfExpr 
 ** is permitted because of the following sub-derivation:
 
-LBOXBRA Expr ListTailExpr // lookahead token appears because ListTailExpr can begin with SEMI
-        IfExpr . 
+LCLYBRA RecordExpr RecordTailExpr // lookahead token appears because RecordTailExpr can begin with SEMI
+        ID EQ Expr // lookahead token is inherited
+              IfExpr . 
 
 ** Conflict (shift/reduce) in state 188.
 ** Token involved: AND

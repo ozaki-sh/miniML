@@ -97,15 +97,15 @@ let rec add_property_for_ty ty defenv mini_env default_property =
     match tytup with
       TyEmpT -> []
     | TyConsT (ty', tytup') -> body_func ty' property @ case_tytuple tytup' property
-  and case_tylist l properties property =
+  and case_ty_list l properties property =
     match l, properties with
       [], [] -> []
     | ty' :: l_rest, property' :: properties_rest ->
        if property' = Out || property = Out then
-         body_func ty' Out @ case_tylist l_rest properties_rest property
+         body_func ty' Out @ case_ty_list l_rest properties_rest property
        else
-         body_func ty' Safe @ case_tylist l_rest properties_rest property
-    | _, _ -> err ("For debug: at case_tylist in add_property")
+         body_func ty' Safe @ case_ty_list l_rest properties_rest property
+    | _, _ -> err ("For debug: at case_ty_list in add_property")
   and body_func ty property =
     match ty with
       TyInt -> []
@@ -117,12 +117,12 @@ let rec add_property_for_ty ty defenv mini_env default_property =
     | TyTuple tytup -> case_tytuple tytup property
     | TyVariant (id, l) | TyRecord (id, l) ->
        (try
-         let (_, properties, _) = Environment.dlookup id defenv in
-         case_tylist l properties property
+         let (_, properties, _) = Environment.lookup id defenv in
+         case_ty_list l properties property
        with
          Environment.Not_bound ->
           let properties = List.assoc id mini_env in
-          case_tylist l properties property)
+          case_ty_list l properties property)
     | TyNone _ -> []
     | TyUnit -> []
     | _ -> err ("For debug: at add_property")

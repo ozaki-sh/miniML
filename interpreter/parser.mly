@@ -186,10 +186,10 @@ AExpr :
   | LPAREN e=Expr COLON ty=FunType RPAREN { let (e', l) = e in (e', ty :: l) }
 
 ListHeadExpr :
-    LBOXBRA e=Expr lst=ListTailExpr { Cons (e, lst) }
+    LBOXBRA e=NotContinueExpr lst=ListTailExpr { Cons (e, lst) }
 
 ListTailExpr :
-    SEMI e=Expr lst=ListTailExpr { Cons (e, lst) }
+    SEMI e=NotContinueExpr lst=ListTailExpr { Cons (e, lst) }
   | option(SEMI) RBOXBRA { Emp }
 
 RecordHeadExpr :

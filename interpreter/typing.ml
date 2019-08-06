@@ -27,6 +27,7 @@ let rec subst_type (subst : subst) t =
   and subst_one_type (tv, ty) t =
     match t with
       TyVar tv' when tv = tv' -> ty
+    | WeakTyVar tv' when tv = -tv' -> ty
     | TyFun (domty, ranty) -> TyFun (subst_one_type (tv, ty) domty, subst_one_type (tv, ty) ranty)
     | TyList ty' -> TyList (subst_one_type (tv, ty) ty')
     | TyTuple tytup -> TyTuple (subst_tytuple (tv, ty) tytup)
@@ -72,7 +73,12 @@ let rec unify eqs =
       | _, TyVar alpha ->
          if MySet.member alpha (freevar_ty ty1) then raise TypeError
          else (alpha, ty1) :: unify (subst_eqs [(alpha, ty1)] rest)
-      | TyNone _, TyNone _ -> unify rest
+      | WeakTyVar alpha, _ ->
+         if MySet.member alpha (freevar_ty ty2) then raise TypeError
+         else (-alpha, ty2) :: unify (subst_eqs [(-alpha, ty2)] rest)
+      | _, WeakTyVar alpha ->
+         if MySet.member alpha (freevar_ty ty1) then raise TypeError
+         else (-alpha, ty1) :: unify (subst_eqs [(-alpha, ty1)] rest)
       | TyNone name, _ -> err ("arguments not expected: " ^ name)
       | _, TyNone name -> err ("arguments expected: " ^ name)
       | TySet (alpha, l1), TySet (beta, l2) ->
@@ -178,7 +184,7 @@ let out_tyvar ty =
        else
          MySet.union (body_func ty' Out) (case_ty_list l_rest p_rest property)
     | _, _ -> err ("For debug: at case_ty_list in out_tyvar")
-  and body_func ty property = print_endline (Debug.string_of_tyrow ty);
+  and body_func ty property =
     match ty with
       TyInt -> MySet.empty
     | TyBool -> MySet.empty
@@ -191,10 +197,10 @@ let out_tyvar ty =
     | TyList ty' -> body_func ty' property
     | TyTuple tytup -> case_tytuple tytup property
     | TyVariant (id, l) ->
-       let (_, properties, _) = Environment.dlookup id !defenv in
+       let (_, properties, _) = Environment.lookup id !defenv in
        case_ty_list l properties property
     | TyRecord (id, l) ->
-       let (_, properties, _) = Environment.dlookup id !defenv in
+       let (_, properties, _) = Environment.lookup id !defenv in
        case_ty_list l properties property
     | TyNone _ -> MySet.empty
     | TyUnit -> MySet.empty
@@ -204,11 +210,57 @@ let out_tyvar ty =
 
 let restrict tysc (exp, _) ty =
   if is_value exp then
-    tysc
+    (tysc, [])
   else
     let out_tyvar = out_tyvar ty in
     let TyScheme (tysc', _) = tysc in
-    TyScheme ((MySet.to_list (MySet.diff (MySet.from_list tysc') out_tyvar), ty))
+    (TyScheme (MySet.to_list (MySet.diff (MySet.from_list tysc') out_tyvar), ty), MySet.to_list out_tyvar)
+
+let transform_into_weak_tv assoc_list ty =
+  let rec body_func ty' =
+    match ty' with
+      TyVar tyvar ->
+       (try
+          WeakTyVar (List.assoc tyvar assoc_list)
+        with
+          Not_found -> ty')
+    | TyFun (domty, ranty) -> TyFun (body_func domty, body_func ranty)
+    | TyList ty'' -> TyList (body_func ty'')
+    | TyTuple tytup -> TyTuple (case_tytuple tytup)
+    | TyVariant (id, l) -> TyVariant (id, case_ty_list l)
+    | TyRecord (id, l) -> TyRecord (id, case_ty_list l)
+    | _ -> ty'
+  and case_tytuple = function
+      TyEmpT -> TyEmpT
+    | TyConsT (ty', tytup') -> TyConsT (body_func ty', case_tytuple tytup')
+  and case_ty_list = function
+      [] -> []
+    | ty' :: rest -> body_func ty' :: case_ty_list rest
+  in
+  body_func ty
+
+let transform_from_weak_tv assoc_list (TyScheme (tv, ty)) =
+  let rec body_func ty' =
+    match ty' with
+      WeakTyVar tyvar ->
+       (try
+          List.assoc tyvar assoc_list
+        with
+          Not_found -> ty')
+    | TyFun (domty, ranty) -> TyFun (body_func domty, body_func ranty)
+    | TyList ty'' -> TyList (body_func ty'')
+    | TyTuple tytup -> TyTuple (case_tytuple tytup)
+    | TyVariant (id, l) -> TyVariant (id, case_ty_list l)
+    | TyRecord (id, l) -> TyRecord (id, case_ty_list l)
+    | _ -> ty'
+  and case_tytuple = function
+      TyEmpT -> TyEmpT
+    | TyConsT (ty', tytup') -> TyConsT (body_func ty', case_tytuple tytup')
+  and case_ty_list = function
+      [] -> []
+    | ty' :: rest -> body_func ty' :: case_ty_list rest
+  in
+  TyScheme (tv, body_func ty)
 
 let make_eqs_about_att_ty ty attached_ty_list =
   let rec main_loop = function
@@ -735,7 +787,7 @@ and ty_exp tyenv = function
             let s4 = unify (eqs_of_subst (s3 @ reflect_dependency rel1 s3)) in
             let ty1' = subst_type s4 ty1 in
             let tysc = closure ty1' tyenv s4 in
-            let tysc' = restrict tysc exp1 ty1' in
+            let (tysc', _) = restrict tysc exp1 ty1' in
             let newtyenv = Environment.extend id tysc' tyenv' in
             ty_let_list rest newtyenv (s4 @ subst) (id :: id_l)
      in
@@ -989,7 +1041,14 @@ let ty_decl tyenv defenv' vardefenv' recdefenv' rev_defenv' decl =
      let (s1, ty, rel) = ty_exp tyenv transformed_e in
      let s2 = finalize_subst s1 in
      let s3 = unify (eqs_of_subst (s2 @ reflect_dependency rel s2)) in
-     [(tyenv, subst_type s3 ty)]
+     let ty' = subst_type s3 ty in
+     let tysc = closure ty' tyenv s3 in
+     let (_, weak) = restrict tysc e ty' in
+     let assoc_list = List.map (fun x -> (x, weak_counter ())) weak in
+     let ty'' = transform_into_weak_tv assoc_list ty' in
+     let subst_only_weak = List.map (fun (x, y) -> (-x, y)) (List.filter (fun (x, _) -> x < 0) s3) in
+     let tyenv' = Environment.map (transform_from_weak_tv subst_only_weak) tyenv in
+     [(tyenv', ty'')]
   | Decls l ->
      let rec make_decl_ty_list l tyenv =
        match l with
@@ -1007,12 +1066,16 @@ let ty_decl tyenv defenv' vardefenv' recdefenv' rev_defenv' decl =
                   let eqs = (eqs_of_subst s1) @ (make_eqs_about_att_ty ty att_ty) in
                   let s2 = squeeze_subst (unify eqs) in
                   let s3 = finalize_subst s2 in
-                  let s4 = finalize_subst (squeeze_subst (unify (eqs_of_subst ((reflect_dependency rel s3) @ s2)))) in
+                  let s4 = finalize_subst (squeeze_subst (unify (eqs_of_subst ((reflect_dependency rel s3) @ s2)))) in (* ? *)
                   let ty' = subst_type s4 ty in
                   let tysc = closure ty' !tyenv s4 in
-                  let tysc' = restrict tysc e ty' in
-                  let newtyenv = Environment.extend id tysc' tyenv' in
-                  (newtyenv, ty') :: make_anddecl_ty_list inner_rest newtyenv (id :: id_l))
+                  let (TyScheme (poly, _), weak) = restrict tysc e ty' in
+                  let assoc_list = List.map (fun x -> (x, weak_counter())) weak in
+                  let ty'' = transform_into_weak_tv assoc_list ty' in
+                  let subst_only_weak = List.map (fun (x, y) -> (-x, y)) (List.filter (fun (x, _) -> x < 0) s4) in
+                  let tyenv'' = Environment.map (transform_from_weak_tv subst_only_weak) tyenv' in
+                  let newtyenv = Environment.extend id (TyScheme (poly, ty'')) tyenv'' in
+                  (newtyenv, ty'') :: make_anddecl_ty_list inner_rest newtyenv (id :: id_l))
           in
           let stringtyvar_to_inttyvar_list = make_Tyvar_to_TyVar_list_for_decl head in
           let transformed_head = transform_decl head stringtyvar_to_inttyvar_list in
