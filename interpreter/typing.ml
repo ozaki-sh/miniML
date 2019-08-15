@@ -5,7 +5,7 @@ type tyenv = tysc Environment.t
 type defenv = (string list * property list * tydecl list) Environment.t
 
 exception Error of string
-exception TypeError
+exception TypeError of string * ty * ty
 exception Not_exact_matched of (ty option * ty option)
 
 let err s = raise (Error s)
@@ -60,7 +60,7 @@ let rec unify eqs =
       | TyList ty', TyList ty'' -> unify ((ty', ty'') :: rest)
       | TyTuple TyEmpT, TyTuple TyEmpT -> unify rest
       | TyTuple TyEmpT, TyTuple (TyConsT (_, _))
-      | TyTuple (TyConsT (_, _)), TyTuple TyEmpT -> raise TypeError
+      | TyTuple (TyConsT (_, _)), TyTuple TyEmpT -> raise (TypeError ("Two tuples are different length", TyInt, TyInt))
       | TyTuple (TyConsT (ty1', tytup1)), TyTuple (TyConsT (ty2', tytup2)) ->
          unify ((ty1', ty2') :: (TyTuple tytup1, TyTuple tytup2) :: rest)
       | TyVariant (name1, tys1), TyVariant (name2, tys2) when name1 = name2 && List.length tys1 = List.length tys2 ->
@@ -68,16 +68,16 @@ let rec unify eqs =
       | TyRecord (name1, tys1), TyRecord (name2, tys2) when name1 = name2 && List.length tys1 = List.length tys2->
          unify ((List.combine tys1 tys2) @ rest)
       | TyVar alpha, _ ->
-         if MySet.member alpha (freevar_ty ty2) then raise TypeError
+         if MySet.member alpha (freevar_ty ty2) then raise (TypeError ("Type variable is not equal to a type which contains it", ty1, ty2))
          else (alpha, ty2) :: unify (subst_eqs [(alpha, ty2)] rest)
       | _, TyVar alpha ->
-         if MySet.member alpha (freevar_ty ty1) then raise TypeError
+         if MySet.member alpha (freevar_ty ty1) then raise (TypeError ("Type variable is not equal to a type which contains it", ty1, ty2))
          else (alpha, ty1) :: unify (subst_eqs [(alpha, ty1)] rest)
       | WeakTyVar alpha, _ ->
-         if MySet.member alpha (freevar_ty ty2) then raise TypeError
+         if MySet.member alpha (freevar_ty ty2) then raise (TypeError ("Type variable is not equal to a type which contains it", ty1, ty2))
          else (-alpha, ty2) :: unify (subst_eqs [(-alpha, ty2)] rest)
       | _, WeakTyVar alpha ->
-         if MySet.member alpha (freevar_ty ty1) then raise TypeError
+         if MySet.member alpha (freevar_ty ty1) then raise (TypeError ("Type variable is not equal to a type which contains it", ty1, ty2))
          else (-alpha, ty1) :: unify (subst_eqs [(-alpha, ty1)] rest)
       | TyNone name, _ -> err ("arguments not expected: " ^ name)
       | _, TyNone name -> err ("arguments expected: " ^ name)
@@ -89,28 +89,19 @@ let rec unify eqs =
            | _, Other -> Other
            | _, _ -> MostOuter in
          (match (MySet.to_list l) with
-            [] -> raise TypeError
+            [] -> raise (TypeError ("", List.hd (MySet.to_list l1), List.hd (MySet.to_list l2)))
           | [ty] -> (alpha, ty) :: (beta, ty) :: unify (subst_eqs [(alpha, ty); (beta, ty)] rest)
           | _ ->
              let ty' = TySet (alpha, l, nest_level) in
              let ty'' = TySet (beta, l, nest_level) in
              (alpha, ty') :: (beta, ty'') :: (alpha, TyVar beta) :: unify (subst_eqs [(alpha, ty'); (beta, ty'')] rest))
       | TySet (alpha, l1, _), _ ->
-         if MySet.member ty2 l1 then (alpha, ty2) :: unify (subst_eqs [(alpha, ty2)] rest) else raise TypeError
+         if MySet.member ty2 l1 then (alpha, ty2) :: unify (subst_eqs [(alpha, ty2)] rest) else raise (TypeError ("", List.hd (MySet.to_list l1), ty2))
       | _, TySet (alpha, l2, _) ->
-         if MySet.member ty1 l2 then (alpha, ty1) :: unify (subst_eqs [(alpha, ty1)] rest) else raise TypeError
-      | _ -> raise TypeError)
+         if MySet.member ty1 l2 then (alpha, ty1) :: unify (subst_eqs [(alpha, ty1)] rest) else raise (TypeError ("", ty1, List.hd (MySet.to_list l2)))
+      | _ -> raise (TypeError ("", ty1, ty2)))
 
 
-
-
-(*  match s with
-    [] -> []
-  | (tyvar, ty) :: rest ->
-     (try
-        (List.assoc (tyvar, ty) dependent_relation) :: reflect_dependency dependent_relation rest
-      with
-        Not_found -> reflect_dependency dependent_relation rest)*)
 
 let squeeze_subst (s : subst) =
   let rec squeeze ty_list ty =
@@ -126,15 +117,15 @@ let squeeze_subst (s : subst) =
              | _, Other -> Other
              | _, _ -> MostOuter in
            (match l with
-              [] -> raise TypeError
+              [] -> raise (TypeError ("", List.hd (MySet.to_list l1), List.hd (MySet.to_list l2)))
             | [ty'] -> squeeze rest ty'
             | _ -> squeeze rest (TySet (alpha, MySet.from_list l, nest_level)))
         | TySet (_, l1, _), _ ->
-           if MySet.member ty l1 then squeeze rest ty else raise TypeError
+           if MySet.member ty l1 then squeeze rest ty else raise (TypeError ("", List.hd (MySet.to_list l1), ty))
         | _, TySet (_, l2, _) ->
-           if MySet.member head l2 then squeeze rest head else raise TypeError
+           if MySet.member head l2 then squeeze rest head else raise (TypeError ("", head, List.hd (MySet.to_list l2)))
         | x, y when x = y -> squeeze rest ty
-        | _ -> raise TypeError)
+        | _ -> raise (TypeError ("", head, ty)))
   and body_func tyvar_set =
     match tyvar_set with
       [] -> []

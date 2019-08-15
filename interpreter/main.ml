@@ -79,7 +79,11 @@ let rec read_eval_print env tyenv defenv rev_defenv store =
   | Parser.Error -> print_error_and_go "Syntax Error! at parser"
   | Failure s -> print_error_and_go ("Syntax Error! at " ^ s)
   | Typing.Error s -> print_error_and_go ("Error! " ^ s)
-  | Typing.TypeError -> print_error_and_go ("Error! Type Error")
+  | Typing.TypeError (s, ty1, ty2) ->
+     if String.length s = 0 then
+       print_error_and_go ("Error! Type Error: " ^ string_of_ty ty1 ^ " is not equal to " ^ string_of_ty ty2)
+     else
+       print_error_and_go ("Error! Type Error: " ^ s)
   | Define.Error s -> print_error_and_go ("Error! " ^ s)
   | Syntax.Error s -> print_error_and_go ("Error! " ^ s)
 (*  | _ -> print_error_and_go "Error! cause is unknown"*)
@@ -183,7 +187,11 @@ let read_eval_print_from_file env tyenv defenv rev_defenv store filename =
          | Failure s -> print_error_and_go ("Syntax Error! at " ^ s)
          | Sys_error s -> print_error_and_go ("File Error! " ^ s)
          | Typing.Error s -> print_error_and_go ("Error! " ^ s)
-         | Typing.TypeError -> print_error_and_go ("Error! Type Error")
+         | Typing.TypeError (s, ty1, ty2) ->
+            if String.length s = 0 then
+              print_error_and_go ("Error! Type Error: " ^ string_of_ty ty1 ^ " is not equal to " ^ string_of_ty ty2)
+            else
+              print_error_and_go ("Error! Type Error: " ^ s)
          | Define.Error s -> print_error_and_go ("Error! " ^ s)
          | Syntax.Error s -> print_error_and_go ("Error! " ^ s)
          | _ -> print_error_and_go "Error! cause is unknown"
