@@ -103,15 +103,6 @@ let rec unify eqs =
 
 
 
-
-(*  match s with
-    [] -> []
-  | (tyvar, ty) :: rest ->
-     (try
-        (List.assoc (tyvar, ty) dependent_relation) :: reflect_dependency dependent_relation rest
-      with
-        Not_found -> reflect_dependency dependent_relation rest)*)
-
 let squeeze_subst (s : subst) =
   let rec squeeze ty_list ty =
     match ty_list with

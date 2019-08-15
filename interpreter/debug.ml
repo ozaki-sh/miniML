@@ -113,7 +113,11 @@ and string_of_tyrow = function
   | TyRecord (name, l) -> "TyRecord (" ^ name ^ ", " ^ string_of_ty_list l ^ ")"
   | TyNone _ -> "TyNone"
   | TyUnit -> "TyUnit"
-  | TySet (tyvar, l) -> "TySet (" ^ (string_of_int tyvar) ^ ", " ^ (List.fold_left (fun x y -> x ^ "; " ^ y) "" ((List.map (fun x -> string_of_tyrow x) (MySet.to_list l)))) ^ ")"
+  | TySet (tyvar, l, nest_level) ->
+     let str = match nest_level with
+         MostOuter -> "MostOuter"
+       | Other -> "Other" in
+     "TySet (" ^ (string_of_int tyvar) ^ ", " ^ (List.fold_left (fun x y -> x ^ "; " ^ y) "" ((List.map (fun x -> string_of_tyrow x) (MySet.to_list l)))) ^ ", " ^ str ^ ")"
 
 let rec string_of_tydecl = function
     Constructor (name, ty) -> name ^ " of " ^ string_of_tyrow ty

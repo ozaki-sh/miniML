@@ -13,6 +13,8 @@ type tyvar = int
 
 type property = Safe | Out
 
+type nest_level = MostOuter | Other
+
 type name = string
 
 type ty =
@@ -30,7 +32,7 @@ type ty =
   | TyRecord of id * ty list
   | TyNone of name
   | TyUnit
-  | TySet of tyvar * ty MySet.t
+  | TySet of tyvar * ty MySet.t * nest_level
 and tytuple = TyEmpT | TyConsT of ty * tytuple
 
 (* 型注釈付きのidを表す型 *)
