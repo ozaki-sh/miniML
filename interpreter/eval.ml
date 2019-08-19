@@ -87,7 +87,7 @@ let replace_param param_ty_assoc_list ty =
     | TyVariant (x, l) -> TyVariant (x, case_ty_list l)
     | TyRecord (x, l) -> TyRecord (x, case_ty_list l)
     | TyNone name -> TyNone name
-    | _ -> err ("For debug: at replace (eval.ml)")
+    | _ -> err ("For debug: at replace_param")
   in
   body_func ty
 

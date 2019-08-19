@@ -722,7 +722,7 @@ and ty_exp tyenv = function
             [(alpha, TySet (alpha, this_ty_set, MostOuter))] in
         let arg_eqs = eqs_of_subst arg_s in
         let this_eqs = eqs_of_subst this_s in
-        let eqs = (eqs_of_subst s1) @ arg_eqs @ this_eqs @ make_eqs_about_att_ty (TyVar alpha) att_ty in print_endline ("uni: " ^ Debug.string_of_subst (unify eqs));
+        let eqs = (eqs_of_subst s1) @ arg_eqs @ this_eqs @ make_eqs_about_att_ty (TyVar alpha) att_ty in
         let s2 = squeeze_subst (unify eqs) in
         (s2, subst_type s2 (TyVar alpha), rel @ arg_rel)
       with
@@ -1071,7 +1071,7 @@ let ty_decl tyenv defenv' vardefenv' recdefenv' rev_defenv' decl =
     Exp e ->
      let stringtyvar_to_inttyvar_list = make_Tyvar_to_TyVar_list e in
      let transformed_e = transform e stringtyvar_to_inttyvar_list in
-     let (s1, ty, rel) = ty_exp tyenv transformed_e in
+     let (s1, ty, rel) = ty_exp tyenv transformed_e in;
      let s2 = finalize_subst s1 rel in
    (*  let s3 = unify (eqs_of_subst (s2 @ reflect_dependency rel s2)) in*)
      let ty' = subst_type s2 ty in
