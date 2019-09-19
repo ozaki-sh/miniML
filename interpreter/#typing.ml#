@@ -96,8 +96,8 @@ let rec unify eqs =
       | _, WeakTyVar alpha ->
          if MySet.member alpha (freevar_ty ty1) then raise (TypeError ("Type variable is not equal to a type which contains it", ty1, ty2))
          else (-alpha, ty1) :: unify (subst_eqs [(-alpha, ty1)] rest)
-      | TyNone name, _ -> err ("arguments not expected: " ^ name)
-      | _, TyNone name -> err ("arguments expected: " ^ name)
+      | TyNone name, _ -> err ("arguments are not expected: " ^ name)
+      | _, TyNone name -> err ("arguments are expected: " ^ name)
       | TySet (alpha, l1, nest_level1), TySet (beta, l2, nest_level2) ->
          let l = MySet.intersection l1 l2 in
          let nest_level =

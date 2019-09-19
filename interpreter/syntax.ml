@@ -191,7 +191,7 @@ let rec string_of_ty ty =
          ", " ^ body_func head ^ inner_loop rest
     in
     if List.length param = 1 then
-      string_of_ty (List.hd param)
+      body_func (List.hd param)
     else
       let str = inner_loop param in
       "(" ^ String.sub str 2 (String.length str - 2)
